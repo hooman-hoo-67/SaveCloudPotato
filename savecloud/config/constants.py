@@ -5,6 +5,7 @@ APP_NAME = "savecloud"
 
 # Current filesystem schema
 SCHEMA_VERSION = 1
+SAVECLOUD_VERSION = "0.1.0"
 
 # Root directory
 SAVECLOUD_HOME = Path(user_data_dir(APP_NAME))
