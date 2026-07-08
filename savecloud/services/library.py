@@ -8,6 +8,7 @@ maintaining the library's filesystem structure.
 
 from __future__ import annotations
 from savecloud.models.game import Game
+from savecloud.models.library_metadata import LibraryMetadata
 
 import json
 import socket
@@ -145,9 +146,53 @@ class SaveCloudLibrary:
         return SaveCloudLibrary.library_directory(game_id) / "versions"
 
     @staticmethod
+    def version_directory(
+        game_id: str,
+        version: int,
+    ) -> Path:
+        """
+        Return the directory for a specific save version.
+        """
+
+        return SaveCloudLibrary.versions_directory(game_id) / f"{version:06d}"
+
+    @staticmethod
     def metadata_path(game_id: str) -> Path:
         """Return the metadata.json path."""
         return SaveCloudLibrary.library_directory(game_id) / "metadata.json"
+
+    @staticmethod
+    def load_library_metadata(
+        game_id: str,
+    ) -> LibraryMetadata:
+        """
+        Load a game's library metadata.
+        """
+
+        with SaveCloudLibrary.metadata_path(game_id).open(
+            "r",
+            encoding="utf-8",
+        ) as file:
+            return LibraryMetadata.from_dict(json.load(file))
+
+    @staticmethod
+    def save_library_metadata(
+        game_id: str,
+        metadata: LibraryMetadata,
+    ) -> None:
+        """
+        Save a game's library metadata.
+        """
+
+        with SaveCloudLibrary.metadata_path(game_id).open(
+            "w",
+            encoding="utf-8",
+        ) as file:
+            json.dump(
+                metadata.to_dict(),
+                file,
+                indent=4,
+            )
 
     @staticmethod
     def create_game_library(game: Game) -> None:
@@ -167,19 +212,20 @@ class SaveCloudLibrary:
             exist_ok=True,
         )
 
-        metadata = {
-            "current_version": game.runtime.current_version,
-            "created_at": datetime.now(UTC).isoformat(),
-            "last_import": None,
-            "last_export": None,
-        }
+        metadata = LibraryMetadata(
+            current_version=game.runtime.current_version,
+            latest_version=game.runtime.current_version,
+            created_at=datetime.now(UTC).isoformat(),
+            last_import=None,
+            last_export=None,
+        )
 
         with SaveCloudLibrary.metadata_path(game_id).open(
             "w",
             encoding="utf-8",
         ) as file:
             json.dump(
-                metadata,
+                metadata.to_dict(),
                 file,
                 indent=4,
             )
