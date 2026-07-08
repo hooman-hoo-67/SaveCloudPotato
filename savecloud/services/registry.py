@@ -195,3 +195,23 @@ class RegistryService:
             manifest=manifest,
             runtime=runtime,
         )
+    @staticmethod
+    def list_games() -> list[Game]:
+        """
+        Return all registered games.
+        """
+
+        games: list[Game] = []
+
+        if not REGISTRY_DIR.exists():
+            return games
+
+        for directory in sorted(REGISTRY_DIR.iterdir()):
+            if not directory.is_dir():
+                continue
+
+            games.append(
+                RegistryService.load_game(directory.name)
+            )
+
+        return games
