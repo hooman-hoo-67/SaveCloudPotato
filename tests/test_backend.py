@@ -71,10 +71,30 @@ def main() -> None:
     print("✓ Game created")
 
     #
+    # Game Library
+    #
+
+    section("TEST 3 - GAME LIBRARY")
+
+    SaveCloudLibrary.create_game_library(game)
+
+    library = SaveCloudLibrary.library_directory(GAME_ID)
+
+    assert library.exists()
+    assert SaveCloudLibrary.current_directory(GAME_ID).exists()
+    assert SaveCloudLibrary.versions_directory(GAME_ID).exists()
+    assert SaveCloudLibrary.metadata_path(GAME_ID).exists()
+
+    print("✓ Library created")
+    print("✓ Current directory exists")
+    print("✓ Versions directory exists")
+    print("✓ Metadata exists")
+
+    #
     # Registry
     #
 
-    section("TEST 3 - REGISTRY")
+    section("TEST 4 - REGISTRY")
 
     RegistryService.create_registry(game)
 
@@ -83,14 +103,13 @@ def main() -> None:
     assert loaded_game.manifest == manifest
 
     print("✓ Registry saved")
-
     print("✓ Registry loaded")
 
     #
     # Device Profile
     #
 
-    section("TEST 4 - DEVICE PROFILE")
+    section("TEST 5 - DEVICE PROFILE")
 
     profile = DeviceProfile(
         device_id=metadata["device_id"],
@@ -115,14 +134,13 @@ def main() -> None:
     )
 
     print("✓ Device profile saved")
-
     print("✓ Device profile loaded")
 
     #
     # Cleanup
     #
 
-    section("TEST 5 - CLEANUP")
+    section("TEST 6 - CLEANUP")
 
     DeviceService.delete_profile(
         metadata["device_id"],
@@ -131,7 +149,13 @@ def main() -> None:
 
     RegistryService.delete_registry(GAME_ID)
 
-    print("✓ Cleanup complete")
+    SaveCloudLibrary.delete_game_library(GAME_ID)
+
+    assert not SaveCloudLibrary.library_directory(GAME_ID).exists()
+
+    print("✓ Device profile removed")
+    print("✓ Registry removed")
+    print("✓ Library removed")
 
     section("ALL TESTS PASSED")
 

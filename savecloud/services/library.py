@@ -7,9 +7,11 @@ maintaining the library's filesystem structure.
 """
 
 from __future__ import annotations
+from savecloud.models.game import Game
 
 import json
 import socket
+import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
@@ -17,6 +19,7 @@ from uuid import uuid4
 from savecloud.config.constants import (
     DIRECTORIES,
     INSTALL_METADATA,
+    LIBRARY_DIR,
     SAVECLOUD_HOME,
     SAVECLOUD_VERSION,
     SCHEMA_VERSION,
@@ -28,18 +31,18 @@ class SaveCloudLibrary:
     Responsible for creating and validating the SaveCloud filesystem.
     """
 
+    # ------------------------------------------------------------------
+    # Installation
+    # ------------------------------------------------------------------
+
     @staticmethod
     def exists() -> bool:
-        """
-        Return True if the SaveCloud root directory exists.
-        """
+        """Return True if the SaveCloud root directory exists."""
         return SAVECLOUD_HOME.exists()
 
     @staticmethod
     def create_install_metadata() -> None:
-        """
-        Create the SaveCloud installation metadata.
-        """
+        """Create installation metadata."""
 
         metadata = {
             "schema_version": SCHEMA_VERSION,
@@ -54,22 +57,25 @@ class SaveCloudLibrary:
 
     @staticmethod
     def installation_metadata() -> dict:
-        """
-        Return the installation metadata.
-        """
+        """Return installation metadata."""
 
         with INSTALL_METADATA.open("r", encoding="utf-8") as file:
             return json.load(file)
 
     @staticmethod
+    def device_id() -> str:
+        """Return this installation's device ID."""
+        return SaveCloudLibrary.installation_metadata()["device_id"]
+
+    @staticmethod
+    def device_name() -> str:
+        """Return this installation's device name."""
+        return SaveCloudLibrary.installation_metadata()["device_name"]
+
+    @staticmethod
     def initialize() -> list[Path]:
         """
         Create the SaveCloud directory structure.
-
-        Returns
-        -------
-        list[Path]
-            Directories that were created.
         """
 
         created: list[Path] = []
@@ -89,11 +95,6 @@ class SaveCloudLibrary:
     def validate() -> bool:
         """
         Validate the SaveCloud installation.
-
-        Returns
-        -------
-        bool
-            True if the installation is valid.
         """
 
         if not SAVECLOUD_HOME.exists():
@@ -123,3 +124,92 @@ class SaveCloudLibrary:
 
         except (json.JSONDecodeError, OSError, KeyError):
             return False
+
+    # ------------------------------------------------------------------
+    # Game Library
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def library_directory(game_id: str) -> Path:
+        """Return the library directory for a game."""
+        return LIBRARY_DIR / game_id
+
+    @staticmethod
+    def current_directory(game_id: str) -> Path:
+        """Return the current save directory."""
+        return (
+            SaveCloudLibrary.library_directory(game_id)
+            / "current"
+        )
+
+    @staticmethod
+    def versions_directory(game_id: str) -> Path:
+        """Return the versions directory."""
+        return (
+            SaveCloudLibrary.library_directory(game_id)
+            / "versions"
+        )
+
+    @staticmethod
+    def metadata_path(game_id: str) -> Path:
+        """Return the metadata.json path."""
+        return (
+            SaveCloudLibrary.library_directory(game_id)
+            / "metadata.json"
+        )
+
+    @staticmethod
+    def create_game_library(game: Game) -> None:
+        """
+        Create the library structure for a game.
+        """
+
+        game_id = game.manifest.game_id
+
+        SaveCloudLibrary.current_directory(
+            game_id
+        ).mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        SaveCloudLibrary.versions_directory(
+            game_id
+        ).mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        metadata = {
+            "current_version": game.runtime.current_version,
+            "created_at": datetime.now(
+                UTC
+            ).isoformat(),
+            "last_import": None,
+            "last_export": None,
+        }
+
+        with SaveCloudLibrary.metadata_path(
+            game_id
+        ).open(
+            "w",
+            encoding="utf-8",
+        ) as file:
+            json.dump(
+                metadata,
+                file,
+                indent=4,
+            )
+
+    @staticmethod
+    def delete_game_library(game_id: str) -> None:
+        """
+        Delete an entire game library.
+        """
+
+        library = SaveCloudLibrary.library_directory(
+            game_id
+        )
+
+        if library.exists():
+            shutil.rmtree(library)
