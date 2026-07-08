@@ -3,8 +3,8 @@ Filesystem management for the SaveCloud Library.
 """
 
 from pathlib import Path
-
-from .constants import SAVECLOUD_HOME, DIRECTORIES
+from savecloud.models.constants import SAVECLOUD_HOME, DIRECTORIES
+#from .constants import SAVECLOUD_HOME, DIRECTORIES
 
 
 class SaveCloudLibrary:
