@@ -4,9 +4,9 @@
 
 SaveCloud separates synchronized data from device-specific data.
 
-Only data required for cross-device synchronization is stored in the synchronized library.
+Only data required for cross-device synchronization is synchronized.
 
-Machine-specific information is stored locally and is never synchronized.
+Machine-specific information is always stored locally.
 
 ---
 
@@ -14,50 +14,41 @@ Machine-specific information is stored locally and is never synchronized.
 
 Linux
 
+```
 ~/.local/share/savecloud/
+```
 
-Future platforms may use their platform-specific application data directory.
+Future platforms will use their platform-specific application data directory.
 
 ---
 
 # Directory Layout
 
-~/.local/share/savecloud/
+```
+savecloud/
 
-├── library/
-├── registry/
-├── device/
-├── cache/
-├── logs/
-├── providers/
+library/
+registry/
+device/
+cache/
+logs/
+providers/
+```
 
 ---
 
 # library/
 
-Purpose
+## Purpose
 
 Stores the canonical copy of every managed game's save data.
 
-This directory is synchronized between devices.
+The Library is synchronized between devices.
 
 Example
 
+```
 library/
-
-pokemon-scarlet/
-
-persona-5/
-
-zelda-totk/
-
----
-
-# library/<game-id>/
-
-Each registered game owns its own library folder.
-
-Example
 
 pokemon-scarlet/
 
@@ -66,39 +57,26 @@ current/
 versions/
 
 metadata.json
+```
 
 ---
 
 # current/
 
-Purpose
+Contains the latest playable save.
 
-Contains the latest canonical save.
-
-This folder is copied into the game's working save directory before launch.
-
-Example
-
-current/
-
-save.dat
-
-slot1.sav
-
-config.bin
+Before launching a game, SaveCloud copies the contents of `current/`
+into the game's working save folder.
 
 ---
 
 # versions/
 
-Purpose
-
-Stores historical save versions.
-
-Versions are immutable.
+Stores immutable historical save versions.
 
 Example
 
+```
 versions/
 
 2026-07-09T18-23-51/
@@ -106,16 +84,17 @@ versions/
 2026-07-08T14-02-17/
 
 2026-07-07T09-51-12/
+```
+
+Versions are never modified after creation.
 
 ---
 
 # metadata.json
 
-Purpose
+Contains metadata about the canonical save.
 
-Stores metadata describing the current save.
-
-Contains
+Example Fields
 
 - Current Version
 - Last Device
@@ -123,134 +102,155 @@ Contains
 - Checksums
 - Save Format Version
 
-Example
-
-metadata.json
-
 ---
 
 # registry/
 
-Purpose
+## Purpose
 
-Stores the global registry of every managed game.
+Stores synchronized information about every managed game.
 
-Registry entries are synchronized between devices.
-
-The registry never stores machine-specific paths.
+Each game owns its own registry directory.
 
 Example
 
+```
 registry/
 
-pokemon-scarlet.json
+pokemon-scarlet/
 
-persona-5.json
+manifest.json
+
+runtime.json
+```
+
+---
+
+# manifest.json
+
+Contains configuration.
+
+Rarely changes.
+
+Example Fields
+
+- Game ID
+- Display Name
+- Launch Type
+- Platform
+- Adapter
+- Storage Backend
+- Backup Enabled
+- Sync Enabled
+
+---
+
+# runtime.json
+
+Contains runtime state.
+
+Frequently updated.
+
+Example Fields
+
+- Current Version
+- Last Device
+- Last Sync
+- Sync Status
+- Pending Upload
+- Last Error
 
 ---
 
 # device/
 
-Purpose
+## Purpose
 
-Stores machine-specific configuration.
+Stores device-specific configuration.
 
 Never synchronized.
 
-Contains
+Structure
 
-- Save paths
-- Steam shortcut IDs
-- ROM paths
-- Emulator locations
-- Launch commands
-
-Example
-
+```
 device/
 
-desktop.json
+desktop/
 
-steamdeck.json
+pokemon-scarlet.json
+
+steamdeck/
+
+pokemon-scarlet.json
+```
+
+Example Fields
+
+- Save Path
+- Steam Shortcut ID
+- ROM Path
+- Emulator Path
+- Launch Command
 
 ---
 
 # cache/
 
-Purpose
-
-Temporary runtime files.
+Temporary runtime data.
 
 Never synchronized.
 
-May contain
-
-- Download cache
-- Temporary copies
-- Hash cache
-
-Can be safely deleted.
+Safe to delete.
 
 ---
 
 # logs/
 
-Purpose
-
-Stores runtime logs.
-
-Never synchronized.
-
-Example
-
-launcher.log
-
-sync.log
-
-errors.log
-
----
-
-# providers/
-
-Purpose
-
-Stores configuration for storage backends.
+Stores application logs.
 
 Never synchronized.
 
 Examples
 
-Syncthing API information
+- launcher.log
+- sync.log
+- errors.log
 
-Google Drive credentials
+---
 
-Dropbox configuration
+# providers/
+
+Stores provider-specific configuration.
+
+Never synchronized.
+
+Examples
+
+- Syncthing
+- Google Drive
+- Dropbox
 
 ---
 
 # Synchronization Rules
 
-Synchronized
+## Synchronized
 
-library/
+- library/
+- registry/
 
-registry/
+## Never Synchronized
 
-Never Synchronized
-
-device/
-
-cache/
-
-logs/
-
-providers/
+- device/
+- cache/
+- logs/
+- providers/
 
 ---
 
 # Save Lifecycle
 
+```
 Game Save Folder
 
 ↓
@@ -263,7 +263,7 @@ Previous Library/current/
 
 ↓
 
-Move into versions/
+Move into Library/versions/
 
 ↓
 
@@ -271,7 +271,11 @@ Update metadata
 
 ↓
 
-Synchronize library/
+Update runtime.json
+
+↓
+
+Synchronize Library
 
 ↓
 
@@ -284,21 +288,22 @@ Import into Working Save Folder
 ↓
 
 Launch Game
+```
 
 ---
 
 # Design Rules
 
-1. The library always contains the canonical save.
+1. The Library always contains the canonical save.
 
-2. Games only access working copies.
+2. Games only interact with working copies.
 
 3. Device-specific information is never synchronized.
 
-4. Historical versions are immutable.
+4. Configuration and runtime state are stored separately.
 
-5. Storage providers never access game save folders directly.
+5. Historical versions are immutable.
 
-6. SaveCloud is responsible for all imports and exports.
+6. Storage providers never access game save folders directly.
 
-7. Every synchronized save must exist inside the library.
+7. Every synchronized save must exist inside the Library before it can be uploaded.

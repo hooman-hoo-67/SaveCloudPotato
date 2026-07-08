@@ -1,93 +1,239 @@
-#Step 1: Register Game
+# SaveCloud Workflow
 
+---
+
+# Workflow 1 — Register Game
+
+```
 User
-▼
+
+↓
+
 savecloud register
-▼
+
+↓
+
 Select Steam Game
-▼
+
+↓
+
 Select Save Folder
-▼
+
+↓
+
 Select Storage Backend
-▼
-Create Registry Entry
-▼
-Create Library Folder
-▼
-Done
 
-#Step 2: Launch Game
+↓
+
+Create Library
+
+↓
+
+Create Registry
+
+↓
+
+Create Device Configuration
+
+↓
+
+Done
+```
+
+---
+
+# Workflow 2 — Launch Game
+
+```
 Steam
+
 ↓
+
 SaveCloud Launcher
+
 ↓
-Read Registry
+
+Read manifest.json
+
 ↓
-Read Device Config
+
+Read runtime.json
+
 ↓
-Download Latest Save
+
+Read Device Configuration
+
 ↓
+
+Import latest save from Library
+
+↓
+
 Create Backup
+
 ↓
-Copy Save → Working Copy
+
+Copy save to Working Save Folder
+
 ↓
+
 Launch Game
+```
 
-#Step 3: Exit Game
+---
+
+# Workflow 3 — Exit Game
+
+```
 Game exits
+
 ↓
-Detect exit
+
+Detect process exit
+
 ↓
-Copy Working Copy
+
+Import Working Save
+
 ↓
+
 Create Version
+
 ↓
-Update Library
+
+Update metadata
+
 ↓
-Trigger Storage Backend
+
+Update runtime.json
+
 ↓
+
+Synchronize Library
+
+↓
+
 Done
+```
 
-#Step 4: New Device
+---
 
+# Workflow 4 — New Device
+
+```
 Install SaveCloud
+
 ↓
+
 Connect Storage Backend
+
 ↓
+
+Download Library
+
+↓
+
 Download Registry
+
 ↓
+
 User links local save folder
+
 ↓
+
+Create Device Configuration
+
+↓
+
 Ready
+```
 
-#Step 5: Restore Version
+---
 
+# Workflow 5 — Restore Version
+
+```
 User
+
 ↓
-Restore
+
+Select Version
+
 ↓
-Choose Version
+
+Backup Current Save
+
 ↓
-Backup Current
-↓
+
 Restore Selected Version
+
 ↓
-Sync
 
-#Step 6: First-time Pairing
+Update runtime.json
 
+↓
+
+Synchronize Library
+```
+
+---
+
+# Workflow 6 — First-Time Pairing
+
+```
 Desktop
+
 ↓
+
 Register Game
+
 ↓
-Generate Game ID
+
+Create manifest.json
+
 ↓
-Sync Registry
+
+Create runtime.json
+
 ↓
+
+Synchronize Registry
+
+↓
+
 Steam Deck
+
 ↓
+
 Import Registry
+
 ↓
-User links local save path
+
+User links local save folder
+
 ↓
+
+Create Device Configuration
+
+↓
+
 Done
+```
+
+---
+
+# Design Principles
+
+1. Every game is explicitly registered by the user.
+
+2. The Library is the canonical source of truth.
+
+3. Runtime state and configuration are stored separately.
+
+4. Device configuration is always local.
+
+5. Games never synchronize directly with cloud providers.
+
+6. SaveCloud always synchronizes the Library, never the game's save folder.
+
+7. Every save operation creates a recoverable history.
