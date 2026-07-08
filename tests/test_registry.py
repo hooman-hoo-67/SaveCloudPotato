@@ -6,8 +6,6 @@ Run with:
 python tests/test_registry.py
 """
 
-from pathlib import Path
-
 from savecloud.models.game import (
     Game,
     GameManifest,

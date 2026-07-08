@@ -8,10 +8,12 @@ from savecloud.services.device import DeviceService
 from savecloud.services.library import SaveCloudLibrary
 from savecloud.services.registry import RegistryService
 
-app = typer.Typer()
+app = typer.Typer(
+    invoke_without_command=True,
+)
 
 
-@app.command()
+@app.callback()
 def info(game_id: str) -> None:
     """
     Display information about a registered game.

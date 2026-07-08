@@ -18,32 +18,86 @@ from savecloud.services.device import DeviceService
 from savecloud.services.library import SaveCloudLibrary
 from savecloud.services.registry import RegistryService
 
-app = typer.Typer()
+from enum import Enum
 
 
-@app.command()
+def choose_enum(enum_type: type[Enum], title: str):
+    """
+    Prompt the user to choose an enum value from a numbered list.
+    """
+
+    typer.echo()
+    typer.echo(title)
+
+    members = list(enum_type)
+
+    for index, member in enumerate(members, start=1):
+        typer.echo(f"{index}. {member.value}")
+
+    while True:
+        choice = typer.prompt(
+            "Choice",
+            type=int,
+        )
+
+        if 1 <= choice <= len(members):
+            return members[choice - 1]
+
+        typer.secho(
+            "Invalid selection. Try again.",
+            fg=typer.colors.RED,
+        )
+
+
+def prompt_required(text: str) -> str:
+    """
+    Prompt until a non-empty value is entered.
+    """
+
+    while True:
+        value = typer.prompt(text).strip()
+
+        if value:
+            return value
+
+        typer.secho(
+            "Value cannot be empty.",
+            fg=typer.colors.RED,
+        )
+
+
+app = typer.Typer(
+    invoke_without_command=True,
+)
+
+
+@app.callback()
 def register() -> None:
     """
     Register a game with SaveCloud.
     """
 
-    display_name = typer.prompt("Display name")
+    display_name = prompt_required("Display name")
 
-    game_id = typer.prompt("Game ID")
+    game_id = prompt_required("Game ID")
 
-    launch_type = LaunchType(
-        typer.prompt("Launch type (steam, heroic, lutris, manual)").lower()
+    launch_type = choose_enum(
+        LaunchType,
+        "Select launch type",
     )
 
-    platform = Platform(typer.prompt("Platform (emulator, proton, native)").lower())
+    platform = choose_enum(
+        Platform,
+        "Select platform",
+    )
 
-    adapter = typer.prompt("Adapter")
+    adapter = prompt_required("Adapter")
 
-    storage_backend = typer.prompt("Storage backend")
+    storage_backend = prompt_required("Storage backend")
 
-    working_save_path = Path(typer.prompt("Working save path"))
+    working_save_path = Path(prompt_required("Working save path"))
 
-    launch_command = typer.prompt("Launch command")
+    launch_command = prompt_required("Launch command")
 
     manifest = GameManifest(
         game_id=game_id,
