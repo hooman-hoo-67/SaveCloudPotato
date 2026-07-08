@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "savecloud"
+version = "0.1.0"
+description = "Steam Cloud for everything."
+readme = "README.md"
+requires-python = ">=3.11"
+
+dependencies = [
+    "typer",
+    "rich",
+    "platformdirs"
+]
+
+[project.scripts]
+savecloud = "savecloud.cli:app"
