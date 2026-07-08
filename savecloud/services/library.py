@@ -137,26 +137,17 @@ class SaveCloudLibrary:
     @staticmethod
     def current_directory(game_id: str) -> Path:
         """Return the current save directory."""
-        return (
-            SaveCloudLibrary.library_directory(game_id)
-            / "current"
-        )
+        return SaveCloudLibrary.library_directory(game_id) / "current"
 
     @staticmethod
     def versions_directory(game_id: str) -> Path:
         """Return the versions directory."""
-        return (
-            SaveCloudLibrary.library_directory(game_id)
-            / "versions"
-        )
+        return SaveCloudLibrary.library_directory(game_id) / "versions"
 
     @staticmethod
     def metadata_path(game_id: str) -> Path:
         """Return the metadata.json path."""
-        return (
-            SaveCloudLibrary.library_directory(game_id)
-            / "metadata.json"
-        )
+        return SaveCloudLibrary.library_directory(game_id) / "metadata.json"
 
     @staticmethod
     def create_game_library(game: Game) -> None:
@@ -166,32 +157,24 @@ class SaveCloudLibrary:
 
         game_id = game.manifest.game_id
 
-        SaveCloudLibrary.current_directory(
-            game_id
-        ).mkdir(
+        SaveCloudLibrary.current_directory(game_id).mkdir(
             parents=True,
             exist_ok=True,
         )
 
-        SaveCloudLibrary.versions_directory(
-            game_id
-        ).mkdir(
+        SaveCloudLibrary.versions_directory(game_id).mkdir(
             parents=True,
             exist_ok=True,
         )
 
         metadata = {
             "current_version": game.runtime.current_version,
-            "created_at": datetime.now(
-                UTC
-            ).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
             "last_import": None,
             "last_export": None,
         }
 
-        with SaveCloudLibrary.metadata_path(
-            game_id
-        ).open(
+        with SaveCloudLibrary.metadata_path(game_id).open(
             "w",
             encoding="utf-8",
         ) as file:
@@ -207,9 +190,7 @@ class SaveCloudLibrary:
         Delete an entire game library.
         """
 
-        library = SaveCloudLibrary.library_directory(
-            game_id
-        )
+        library = SaveCloudLibrary.library_directory(game_id)
 
         if library.exists():
             shutil.rmtree(library)

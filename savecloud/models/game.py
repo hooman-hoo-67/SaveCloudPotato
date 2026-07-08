@@ -12,10 +12,10 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Optional
 
-
 #
 # Enumerations
 #
+
 
 class LaunchType(StrEnum):
     """How the game is launched."""
@@ -48,6 +48,7 @@ class SyncStatus(StrEnum):
 # Game Manifest
 #
 
+
 @dataclass(frozen=True, slots=True)
 class GameManifest:
     """
@@ -74,6 +75,7 @@ class GameManifest:
 # Runtime
 #
 
+
 @dataclass(slots=True)
 class GameRuntime:
     """
@@ -95,14 +97,13 @@ class GameRuntime:
 
     last_error: Optional[str] = None
 
-    created_at: datetime = field(
-        default_factory=lambda: datetime.now(UTC)
-    )
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 #
 # Game
 #
+
 
 @dataclass(slots=True)
 class Game:

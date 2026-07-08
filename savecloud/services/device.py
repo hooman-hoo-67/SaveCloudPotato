@@ -37,10 +37,7 @@ class DeviceService:
         """
         Return the profile path for a game on a device.
         """
-        return (
-            DeviceService.device_directory(device_id)
-            / f"{game_id}.json"
-        )
+        return DeviceService.device_directory(device_id) / f"{game_id}.json"
 
     @staticmethod
     def exists(
@@ -72,23 +69,17 @@ class DeviceService:
         Save a device profile.
         """
 
-        DeviceService.device_directory(
-            profile.device_id
-        ).mkdir(
+        DeviceService.device_directory(profile.device_id).mkdir(
             parents=True,
             exist_ok=True,
         )
 
         data = asdict(profile)
 
-        data["working_save_path"] = str(
-            profile.working_save_path
-        )
+        data["working_save_path"] = str(profile.working_save_path)
 
         if profile.last_local_sync is not None:
-            data["last_local_sync"] = (
-                profile.last_local_sync.isoformat()
-            )
+            data["last_local_sync"] = profile.last_local_sync.isoformat()
 
         with DeviceService.profile_path(
             profile.device_id,
@@ -124,17 +115,13 @@ class DeviceService:
         last_local_sync = None
 
         if data["last_local_sync"] is not None:
-            last_local_sync = datetime.fromisoformat(
-                data["last_local_sync"]
-            )
+            last_local_sync = datetime.fromisoformat(data["last_local_sync"])
 
         return DeviceProfile(
             device_id=data["device_id"],
             device_name=data["device_name"],
             game_id=data["game_id"],
-            working_save_path=Path(
-                data["working_save_path"]
-            ),
+            working_save_path=Path(data["working_save_path"]),
             launch_command=data["launch_command"],
             last_local_sync=last_local_sync,
             enabled=data["enabled"],
@@ -157,12 +144,7 @@ class DeviceService:
         if profile.exists():
             profile.unlink()
 
-        device_directory = (
-            DeviceService.device_directory(device_id)
-        )
+        device_directory = DeviceService.device_directory(device_id)
 
-        if (
-            device_directory.exists()
-            and not any(device_directory.iterdir())
-        ):
+        if device_directory.exists() and not any(device_directory.iterdir()):
             shutil.rmtree(device_directory)

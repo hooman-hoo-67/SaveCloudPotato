@@ -32,30 +32,18 @@ def register() -> None:
     game_id = typer.prompt("Game ID")
 
     launch_type = LaunchType(
-        typer.prompt(
-            "Launch type (steam, heroic, lutris, manual)"
-        ).lower()
+        typer.prompt("Launch type (steam, heroic, lutris, manual)").lower()
     )
 
-    platform = Platform(
-        typer.prompt(
-            "Platform (emulator, proton, native)"
-        ).lower()
-    )
+    platform = Platform(typer.prompt("Platform (emulator, proton, native)").lower())
 
     adapter = typer.prompt("Adapter")
 
-    storage_backend = typer.prompt(
-        "Storage backend"
-    )
+    storage_backend = typer.prompt("Storage backend")
 
-    working_save_path = Path(
-        typer.prompt("Working save path")
-    )
+    working_save_path = Path(typer.prompt("Working save path"))
 
-    launch_command = typer.prompt(
-        "Launch command"
-    )
+    launch_command = typer.prompt("Launch command")
 
     manifest = GameManifest(
         game_id=game_id,

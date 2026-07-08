@@ -24,9 +24,7 @@ def unregister(game_id: str) -> None:
         )
         raise typer.Exit(code=1)
 
-    confirmed = typer.confirm(
-        f'Unregister "{game_id}"?'
-    )
+    confirmed = typer.confirm(f'Unregister "{game_id}"?')
 
     if not confirmed:
         typer.echo("Operation cancelled.")

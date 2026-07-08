@@ -6,9 +6,7 @@ from savecloud.commands.list import app as list_app
 from savecloud.commands.info import app as info_app
 from savecloud.commands.unregister import app as unregister_app
 
-app = typer.Typer(
-    help="Steam Cloud for everything."
-)
+app = typer.Typer(help="Steam Cloud for everything.")
 
 app.add_typer(
     init.app,

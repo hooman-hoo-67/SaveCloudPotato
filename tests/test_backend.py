@@ -20,7 +20,6 @@ from savecloud.services.device import DeviceService
 from savecloud.services.library import SaveCloudLibrary
 from savecloud.services.registry import RegistryService
 
-
 GAME_ID = "pokemon-scarlet"
 
 
@@ -128,10 +127,7 @@ def main() -> None:
 
     assert loaded_profile.device_id == profile.device_id
     assert loaded_profile.game_id == profile.game_id
-    assert (
-        loaded_profile.working_save_path
-        == profile.working_save_path
-    )
+    assert loaded_profile.working_save_path == profile.working_save_path
 
     print("✓ Device profile saved")
     print("✓ Device profile loaded")

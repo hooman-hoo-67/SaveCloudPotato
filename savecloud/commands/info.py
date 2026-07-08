@@ -35,44 +35,26 @@ def info(game_id: str) -> None:
     typer.echo("----------------")
     typer.echo()
 
-    typer.echo(
-        f"Display Name    : {game.manifest.display_name}"
-    )
+    typer.echo(f"Display Name    : {game.manifest.display_name}")
 
-    typer.echo(
-        f"Game ID         : {game.manifest.game_id}"
-    )
+    typer.echo(f"Game ID         : {game.manifest.game_id}")
 
     typer.echo()
 
-    typer.echo(
-        f"Launch Type     : {game.manifest.launch_type.value}"
-    )
+    typer.echo(f"Launch Type     : {game.manifest.launch_type.value}")
 
-    typer.echo(
-        f"Platform        : {game.manifest.platform.value}"
-    )
+    typer.echo(f"Platform        : {game.manifest.platform.value}")
 
-    typer.echo(
-        f"Adapter         : {game.manifest.adapter}"
-    )
+    typer.echo(f"Adapter         : {game.manifest.adapter}")
 
     typer.echo()
 
-    typer.echo(
-        f"Storage Backend : {game.manifest.storage_backend}"
-    )
+    typer.echo(f"Storage Backend : {game.manifest.storage_backend}")
 
     typer.echo()
 
-    typer.echo(
-        f"Device          : {profile.device_name}"
-    )
+    typer.echo(f"Device          : {profile.device_name}")
 
-    typer.echo(
-        f"Working Save    : {profile.working_save_path}"
-    )
+    typer.echo(f"Working Save    : {profile.working_save_path}")
 
-    typer.echo(
-        f"Launch Command  : {profile.launch_command}"
-    )
+    typer.echo(f"Launch Command  : {profile.launch_command}")

@@ -18,7 +18,6 @@ from savecloud.models.game import (
 
 from savecloud.services.registry import RegistryService
 
-
 GAME_ID = "pokemon-scarlet"
 
 

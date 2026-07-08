@@ -38,18 +38,12 @@ class RegistryService:
     @staticmethod
     def registry_manifest_path(game_id: str) -> Path:
         """Return the manifest.json path."""
-        return (
-            RegistryService.registry_directory(game_id)
-            / "manifest.json"
-        )
+        return RegistryService.registry_directory(game_id) / "manifest.json"
 
     @staticmethod
     def registry_runtime_path(game_id: str) -> Path:
         """Return the runtime.json path."""
-        return (
-            RegistryService.registry_directory(game_id)
-            / "runtime.json"
-        )
+        return RegistryService.registry_directory(game_id) / "runtime.json"
 
     @staticmethod
     def exists(game_id: str) -> bool:
@@ -62,13 +56,11 @@ class RegistryService:
         Create a registry for a game.
         """
 
-        RegistryService.registry_directory(
-            game.manifest.game_id
-        ).mkdir(parents=True, exist_ok=True)
-
-        RegistryService.save_registry_manifest(
-            game.manifest
+        RegistryService.registry_directory(game.manifest.game_id).mkdir(
+            parents=True, exist_ok=True
         )
+
+        RegistryService.save_registry_manifest(game.manifest)
 
         RegistryService.save_registry_runtime(
             game.manifest.game_id,
@@ -94,18 +86,18 @@ class RegistryService:
         Save a GameManifest to manifest.json.
         """
 
-        RegistryService.registry_directory(
-            manifest.game_id
-        ).mkdir(parents=True, exist_ok=True)
+        RegistryService.registry_directory(manifest.game_id).mkdir(
+            parents=True, exist_ok=True
+        )
 
         data = asdict(manifest)
 
         data["launch_type"] = manifest.launch_type.value
         data["platform"] = manifest.platform.value
 
-        with RegistryService.registry_manifest_path(
-            manifest.game_id
-        ).open("w", encoding="utf-8") as file:
+        with RegistryService.registry_manifest_path(manifest.game_id).open(
+            "w", encoding="utf-8"
+        ) as file:
             json.dump(data, file, indent=4)
 
     @staticmethod
@@ -117,9 +109,7 @@ class RegistryService:
         Save a GameRuntime to runtime.json.
         """
 
-        RegistryService.registry_directory(
-            game_id
-        ).mkdir(parents=True, exist_ok=True)
+        RegistryService.registry_directory(game_id).mkdir(parents=True, exist_ok=True)
 
         data = asdict(runtime)
 
@@ -130,9 +120,9 @@ class RegistryService:
 
         data["created_at"] = runtime.created_at.isoformat()
 
-        with RegistryService.registry_runtime_path(
-            game_id
-        ).open("w", encoding="utf-8") as file:
+        with RegistryService.registry_runtime_path(game_id).open(
+            "w", encoding="utf-8"
+        ) as file:
             json.dump(data, file, indent=4)
 
     @staticmethod
@@ -141,60 +131,47 @@ class RegistryService:
         Load a Game from the registry.
         """
 
-        with RegistryService.registry_manifest_path(
-            game_id
-        ).open("r", encoding="utf-8") as file:
+        with RegistryService.registry_manifest_path(game_id).open(
+            "r", encoding="utf-8"
+        ) as file:
             manifest_data = json.load(file)
 
         manifest = GameManifest(
             game_id=manifest_data["game_id"],
             display_name=manifest_data["display_name"],
-            launch_type=LaunchType(
-                manifest_data["launch_type"]
-            ),
-            platform=Platform(
-                manifest_data["platform"]
-            ),
+            launch_type=LaunchType(manifest_data["launch_type"]),
+            platform=Platform(manifest_data["platform"]),
             adapter=manifest_data["adapter"],
             storage_backend=manifest_data["storage_backend"],
             backup_enabled=manifest_data["backup_enabled"],
             sync_enabled=manifest_data["sync_enabled"],
         )
 
-        with RegistryService.registry_runtime_path(
-            game_id
-        ).open("r", encoding="utf-8") as file:
+        with RegistryService.registry_runtime_path(game_id).open(
+            "r", encoding="utf-8"
+        ) as file:
             runtime_data = json.load(file)
 
         last_sync = None
 
         if runtime_data["last_sync"] is not None:
-            last_sync = datetime.fromisoformat(
-                runtime_data["last_sync"]
-            )
+            last_sync = datetime.fromisoformat(runtime_data["last_sync"])
 
         runtime = GameRuntime(
-            current_version=runtime_data[
-                "current_version"
-            ],
+            current_version=runtime_data["current_version"],
             last_device=runtime_data["last_device"],
             last_sync=last_sync,
-            status=SyncStatus(
-                runtime_data["status"]
-            ),
-            pending_upload=runtime_data[
-                "pending_upload"
-            ],
+            status=SyncStatus(runtime_data["status"]),
+            pending_upload=runtime_data["pending_upload"],
             last_error=runtime_data["last_error"],
-            created_at=datetime.fromisoformat(
-                runtime_data["created_at"]
-            ),
+            created_at=datetime.fromisoformat(runtime_data["created_at"]),
         )
 
         return Game(
             manifest=manifest,
             runtime=runtime,
         )
+
     @staticmethod
     def list_games() -> list[Game]:
         """
@@ -210,8 +187,6 @@ class RegistryService:
             if not directory.is_dir():
                 continue
 
-            games.append(
-                RegistryService.load_game(directory.name)
-            )
+            games.append(RegistryService.load_game(directory.name))
 
         return games

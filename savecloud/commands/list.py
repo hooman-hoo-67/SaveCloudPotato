@@ -25,6 +25,4 @@ def list() -> None:
     typer.echo("----------------")
 
     for game in games:
-        typer.echo(
-            f"{game.manifest.display_name} ({game.manifest.game_id})"
-        )
+        typer.echo(f"{game.manifest.display_name} ({game.manifest.game_id})")
