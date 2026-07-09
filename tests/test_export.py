@@ -147,21 +147,44 @@ def main() -> None:
 
     section("TEST 6 - VERIFY CONTENTS")
 
-    assert (TEST_SAVE_DIR / "save.dat").read_text(encoding="utf-8") == "pokemon save"
+    assert (TEST_SAVE_DIR / "save.dat").read_text(
+        encoding="utf-8",
+    ) == "pokemon save"
 
     assert (TEST_SAVE_DIR / "settings.ini").read_text(
-        encoding="utf-8"
+        encoding="utf-8",
     ) == "graphics=high"
 
     print("✓ File contents verified")
 
     #
+    # Validation
+    #
+
+    section("TEST 7 - MISSING MANAGED SAVE")
+
+    shutil.rmtree(SaveService.current_save(game))
+
+    assert not SaveService.current_save(game).exists()
+
+    try:
+        SaveService.export_save(
+            game,
+            profile,
+        )
+    except FileNotFoundError:
+        print("✓ Correct exception raised")
+    else:
+        raise AssertionError("Expected FileNotFoundError")
+
+    #
     # Cleanup
     #
 
-    section("TEST 7 - CLEANUP")
+    section("TEST 8 - CLEANUP")
 
-    shutil.rmtree(TEST_SAVE_DIR)
+    if TEST_SAVE_DIR.exists():
+        shutil.rmtree(TEST_SAVE_DIR)
 
     SaveCloudLibrary.delete_game_library(GAME_ID)
 

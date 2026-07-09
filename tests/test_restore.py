@@ -160,17 +160,32 @@ def main() -> None:
     )
 
     assert metadata.current_version == 1
-
     assert metadata.latest_version == 1
 
     print("✓ Original contents restored")
     print("✓ Metadata updated")
 
     #
+    # Validation
+    #
+
+    section("TEST 8 - INVALID VERSION")
+
+    try:
+        SaveService.restore_version(
+            game,
+            999,
+        )
+    except FileNotFoundError:
+        print("✓ Correct exception raised")
+    else:
+        raise AssertionError("Expected FileNotFoundError")
+
+    #
     # Cleanup
     #
 
-    section("TEST 8 - CLEANUP")
+    section("TEST 9 - CLEANUP")
 
     shutil.rmtree(TEST_SAVE_DIR)
 

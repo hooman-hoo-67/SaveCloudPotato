@@ -75,6 +75,9 @@ class SaveService:
 
         source = SaveService.current_save(game)
 
+        if not source.exists():
+            raise FileNotFoundError(f"Managed save does not exist: {source}")
+
         destination = profile.working_save_path
 
         if destination.exists():
@@ -104,6 +107,9 @@ class SaveService:
             game,
         )
 
+        if not source.exists():
+            raise FileNotFoundError(f"Managed save does not exist: {source}")
+
         destination = SaveCloudLibrary.version_directory(
             game.manifest.game_id,
             next_version,
@@ -132,6 +138,12 @@ class SaveService:
         """
         Restore a previous version.
         """
+
+        if not SaveService.version_exists(
+            game,
+            version,
+        ):
+            raise FileNotFoundError(f"Version {version} does not exist.")
 
         source = SaveCloudLibrary.version_directory(
             game.manifest.game_id,

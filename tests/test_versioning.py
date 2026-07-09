@@ -1,5 +1,5 @@
 """
-Test SaveService.create_version().
+Test SaveService versioning.
 
 Run with:
 
@@ -91,7 +91,7 @@ def main() -> None:
     print("✓ Game created")
 
     #
-    # Create library
+    # Import save
     #
 
     section("TEST 3 - IMPORT SAVE")
@@ -106,45 +106,83 @@ def main() -> None:
     print("✓ Save imported")
 
     #
-    # Create version
+    # Create versions
     #
 
-    section("TEST 4 - CREATE VERSION")
+    section("TEST 4 - CREATE VERSIONS")
 
     SaveService.create_version(game)
+    SaveService.create_version(game)
+    SaveService.create_version(game)
 
-    version = SaveCloudLibrary.version_directory(
-        GAME_ID,
-        1,
-    )
+    print("✓ Versions created")
 
-    assert version.exists()
+    #
+    # Verify version directories
+    #
 
-    assert (version / "save.dat").exists()
+    section("TEST 5 - VERIFY VERSION DIRECTORIES")
 
-    print("✓ Version created")
+    for version in (1, 2, 3):
+        version_directory = SaveCloudLibrary.version_directory(
+            GAME_ID,
+            version,
+        )
+
+        assert version_directory.exists()
+        assert (version_directory / "save.dat").exists()
+
+    print("✓ Version directories verified")
 
     #
     # Verify metadata
     #
 
-    section("TEST 5 - VERIFY METADATA")
+    section("TEST 6 - VERIFY METADATA")
 
     metadata = SaveCloudLibrary.load_library_metadata(
         GAME_ID,
     )
 
     assert metadata.current_version == 0
+    assert metadata.latest_version == 3
 
-    assert metadata.latest_version == 1
+    print("✓ Metadata verified")
 
-    print("✓ Metadata updated")
+    #
+    # List versions
+    #
+
+    section("TEST 7 - LIST VERSIONS")
+
+    versions = SaveService.list_versions(game)
+
+    assert versions == [1, 2, 3]
+
+    print(f"Versions: {versions}")
+    print("✓ Versions listed correctly")
+
+    #
+    # Version exists
+    #
+
+    section("TEST 8 - VERSION EXISTS")
+
+    assert SaveService.version_exists(game, 1)
+    assert SaveService.version_exists(game, 2)
+    assert SaveService.version_exists(game, 3)
+
+    assert not SaveService.version_exists(game, 4)
+    assert not SaveService.version_exists(game, 999)
+
+    print("✓ Existing versions detected")
+    print("✓ Missing versions rejected")
 
     #
     # Cleanup
     #
 
-    section("TEST 6 - CLEANUP")
+    section("TEST 9 - CLEANUP")
 
     shutil.rmtree(TEST_SAVE_DIR)
 

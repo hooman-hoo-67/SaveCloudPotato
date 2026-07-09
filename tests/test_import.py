@@ -41,6 +41,8 @@ def main() -> None:
     if TEST_SAVE_DIR.exists():
         shutil.rmtree(TEST_SAVE_DIR)
 
+    SaveCloudLibrary.delete_game_library(GAME_ID)
+
     TEST_SAVE_DIR.mkdir(parents=True)
 
     #
@@ -117,12 +119,30 @@ def main() -> None:
     print("✓ Save imported")
 
     #
+    # Validation
+    #
+
+    section("TEST 4 - MISSING WORKING SAVE")
+
+    shutil.rmtree(TEST_SAVE_DIR)
+
+    assert not TEST_SAVE_DIR.exists()
+
+    try:
+        SaveService.import_save(
+            game,
+            profile,
+        )
+    except FileNotFoundError:
+        print("✓ Correct exception raised")
+    else:
+        raise AssertionError("Expected FileNotFoundError")
+
+    #
     # Cleanup
     #
 
-    section("TEST 4 - CLEANUP")
-
-    shutil.rmtree(TEST_SAVE_DIR)
+    section("TEST 5 - CLEANUP")
 
     SaveCloudLibrary.delete_game_library(GAME_ID)
 
