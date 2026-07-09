@@ -3,9 +3,11 @@ Register a game with SaveCloud.
 """
 
 from pathlib import Path
+from enum import Enum
 
 import typer
 
+from savecloud.adapters import SUPPORTED_ADAPTERS
 from savecloud.models.device_profile import DeviceProfile
 from savecloud.models.game import (
     Game,
@@ -18,10 +20,16 @@ from savecloud.services.device import DeviceService
 from savecloud.services.library import SaveCloudLibrary
 from savecloud.services.registry import RegistryService
 
-from enum import Enum
+from savecloud.adapters import (
+    adapter_exists,
+    get_adapter,
+)
 
 
-def choose_enum(enum_type: type[Enum], title: str):
+def choose_enum(
+    enum_type: type[Enum],
+    title: str,
+):
     """
     Prompt the user to choose an enum value from a numbered list.
     """
@@ -31,7 +39,10 @@ def choose_enum(enum_type: type[Enum], title: str):
 
     members = list(enum_type)
 
-    for index, member in enumerate(members, start=1):
+    for index, member in enumerate(
+        members,
+        start=1,
+    ):
         typer.echo(f"{index}. {member.value}")
 
     while True:
@@ -91,13 +102,72 @@ def register() -> None:
         "Select platform",
     )
 
-    adapter = prompt_required("Adapter")
+    adapter = prompt_required(
+        "Adapter",
+    ).strip().lower()
 
-    storage_backend = prompt_required("Storage backend")
+    if not adapter_exists(adapter):
+        typer.secho(
+            f'Unsupported adapter: "{adapter}".',
+            fg=typer.colors.RED,
+        )
 
-    working_save_path = Path(prompt_required("Working save path"))
+        typer.echo(
+           "Supported adapters:"
+       )
 
-    launch_command = prompt_required("Launch command")
+        for name in SUPPORTED_ADAPTERS:
+            typer.echo(f"  - {name}")
+
+        raise typer.Exit(
+            code=1,
+        )
+
+    adapter_class = get_adapter(adapter)
+
+    storage_backend = prompt_required(
+        "Storage backend",
+    )
+
+    if adapter == "eden":
+        title_id = prompt_required(
+            "Title ID",
+        )
+
+        working_save_path = adapter_class.find_save(
+            title_id,
+        )
+
+        if working_save_path is None:
+            typer.secho(
+                f"Save directory for title ID '{title_id}' not found.",
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(
+                code=1,
+            )
+    else:
+        working_save_path = Path(
+            prompt_required(
+                "Working save path",
+            )
+        )
+
+    if not adapter_class.validate_save(
+        working_save_path,
+    ):
+        typer.secho(
+            f"{adapter_class.display_name()} save directory is invalid.",
+            fg=typer.colors.RED,
+        )
+
+        raise typer.Exit(
+            code=1,
+        )
+
+    launch_command = prompt_required(
+        "Launch command",
+    )
 
     manifest = GameManifest(
         game_id=game_id,
@@ -123,16 +193,30 @@ def register() -> None:
         launch_command=launch_command,
     )
 
-    if RegistryService.exists(game.manifest.game_id):
+    if RegistryService.exists(
+        game.manifest.game_id,
+    ):
         typer.secho(
             f'Game "{game.manifest.game_id}" is already registered.',
             fg=typer.colors.RED,
         )
-        raise typer.Exit(code=1)
+        raise typer.Exit(
+            code=1,
+        )
 
-    RegistryService.create_registry(game)
-    SaveCloudLibrary.create_game_library(game)
-    DeviceService.create_profile(profile)
+    RegistryService.create_registry(
+        game,
+    )
+
+    SaveCloudLibrary.create_game_library(
+        game,
+    )
+
+    DeviceService.create_profile(
+        profile,
+    )
 
     typer.echo()
-    typer.echo("✓ Game successfully registered.")
+    typer.echo(
+        "✓ Game successfully registered."
+    )
