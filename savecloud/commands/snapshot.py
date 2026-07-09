@@ -10,7 +10,6 @@ from savecloud.services.library import SaveCloudLibrary
 from savecloud.services.registry import RegistryService
 from savecloud.services.save import SaveService
 
-
 app = typer.Typer()
 
 
@@ -35,9 +34,6 @@ def snapshot(
     )
 
     typer.secho(
-        (
-            "✓ Snapshot "
-            f"{metadata.latest_version} created."
-        ),
+        ("✓ Snapshot " f"{metadata.latest_version} created."),
         fg=typer.colors.GREEN,
     )

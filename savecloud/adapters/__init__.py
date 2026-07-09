@@ -24,7 +24,4 @@ def adapter_exists(name: str) -> bool:
     Return True if an adapter exists.
     """
 
-    return (
-        get_adapter(name)
-        is not None
-    )
+    return get_adapter(name) is not None

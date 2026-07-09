@@ -102,9 +102,13 @@ def register() -> None:
         "Select platform",
     )
 
-    adapter = prompt_required(
-        "Adapter",
-    ).strip().lower()
+    adapter = (
+        prompt_required(
+            "Adapter",
+        )
+        .strip()
+        .lower()
+    )
 
     if not adapter_exists(adapter):
         typer.secho(
@@ -112,9 +116,7 @@ def register() -> None:
             fg=typer.colors.RED,
         )
 
-        typer.echo(
-           "Supported adapters:"
-       )
+        typer.echo("Supported adapters:")
 
         for name in SUPPORTED_ADAPTERS:
             typer.echo(f"  - {name}")
@@ -217,6 +219,4 @@ def register() -> None:
     )
 
     typer.echo()
-    typer.echo(
-        "✓ Game successfully registered."
-    )
+    typer.echo("✓ Game successfully registered.")

@@ -11,7 +11,6 @@ from savecloud.services.library import SaveCloudLibrary
 from savecloud.services.registry import RegistryService
 from savecloud.services.save import SaveService
 
-
 app = typer.Typer()
 
 

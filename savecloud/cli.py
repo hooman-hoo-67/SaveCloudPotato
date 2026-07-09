@@ -11,7 +11,6 @@ from savecloud.commands import snapshot
 from savecloud.commands import history
 from savecloud.commands import restore
 
-
 app = typer.Typer(help="Steam Cloud for everything.")
 
 app.add_typer(
@@ -63,8 +62,6 @@ app.add_typer(
     restore.app,
     name="restore",
 )
-
-
 
 
 if __name__ == "__main__":

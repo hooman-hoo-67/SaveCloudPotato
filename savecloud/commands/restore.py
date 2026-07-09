@@ -9,7 +9,6 @@ import typer
 from savecloud.services.registry import RegistryService
 from savecloud.services.save import SaveService
 
-
 app = typer.Typer()
 
 

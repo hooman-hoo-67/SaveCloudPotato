@@ -9,7 +9,6 @@ import typer
 from savecloud.services.registry import RegistryService
 from savecloud.services.save import SaveService
 
-
 app = typer.Typer()
 
 
@@ -30,9 +29,7 @@ def history(
     )
 
     if not versions:
-        typer.echo(
-            "No snapshots available."
-        )
+        typer.echo("No snapshots available.")
         return
 
     typer.echo("Available snapshots")
@@ -40,4 +37,3 @@ def history(
 
     for version in versions:
         typer.echo(version)
-        
