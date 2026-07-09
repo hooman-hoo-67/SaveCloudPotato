@@ -53,6 +53,16 @@ class SaveService:
 
         source = profile.working_save_path
 
+        if not source.exists():
+            raise FileNotFoundError(
+                f"Working save directory does not exist: {source}"
+            )
+
+        if not source.is_dir():
+            raise NotADirectoryError(
+                f"Working save path is not a directory: {source}"
+            )
+
         destination = SaveService.current_save(game)
 
         if destination.exists():
@@ -76,7 +86,14 @@ class SaveService:
         source = SaveService.current_save(game)
 
         if not source.exists():
-            raise FileNotFoundError(f"Managed save does not exist: {source}")
+            raise FileNotFoundError(
+                f"Working save directory does not exist: {source}"
+            )
+
+        if not source.is_dir():
+            raise NotADirectoryError(
+                f"Working save path is not a directory: {source}"
+            )
 
         destination = profile.working_save_path
 
@@ -108,7 +125,14 @@ class SaveService:
         )
 
         if not source.exists():
-            raise FileNotFoundError(f"Managed save does not exist: {source}")
+            raise FileNotFoundError(
+                f"Working save directory does not exist: {source}"
+            )
+
+        if not source.is_dir():
+            raise NotADirectoryError(
+                f"Working save path is not a directory: {source}"
+            )
 
         destination = SaveCloudLibrary.version_directory(
             game.manifest.game_id,

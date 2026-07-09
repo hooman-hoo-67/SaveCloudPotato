@@ -5,6 +5,12 @@ from savecloud.commands.register import app as register_app
 from savecloud.commands.list import app as list_app
 from savecloud.commands.info import app as info_app
 from savecloud.commands.unregister import app as unregister_app
+from savecloud.commands import import_save
+from savecloud.commands import export_save
+from savecloud.commands import snapshot
+from savecloud.commands import history
+from savecloud.commands import restore
+
 
 app = typer.Typer(help="Steam Cloud for everything.")
 
@@ -32,6 +38,34 @@ app.add_typer(
     unregister_app,
     name="unregister",
 )
+
+app.add_typer(
+    import_save.app,
+    name="import",
+)
+
+app.add_typer(
+    export_save.app,
+    name="export",
+)
+
+app.add_typer(
+    snapshot.app,
+    name="snapshot",
+)
+
+app.add_typer(
+    history.app,
+    name="history",
+)
+
+app.add_typer(
+    restore.app,
+    name="restore",
+)
+
+
+
 
 if __name__ == "__main__":
     app()
