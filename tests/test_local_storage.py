@@ -89,7 +89,6 @@ def main() -> None:
         runtime=runtime,
     )
 
-
     SaveCloudLibrary.create_game_library(game)
 
     shutil.copytree(

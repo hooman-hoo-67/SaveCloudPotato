@@ -38,6 +38,7 @@ class SyncStatus(StrEnum):
     """Current synchronization state."""
 
     UNKNOWN = "unknown"
+    RUNNING = "running"
     SYNCED = "synced"
     PENDING = "pending"
     CONFLICT = "conflict"
@@ -91,6 +92,12 @@ class GameRuntime:
 
     last_sync: Optional[datetime] = None
 
+    last_launch: Optional[datetime] = None
+
+    last_exit: Optional[datetime] = None
+
+    last_exit_code: Optional[int] = None
+
     status: SyncStatus = SyncStatus.UNKNOWN
 
     pending_upload: bool = False
@@ -107,6 +114,32 @@ class GameRuntime:
         self.status = SyncStatus.PENDING
         self.pending_upload = True
         self.last_error = None
+
+    def mark_running(self) -> None:
+        """
+        Mark the game as currently running.
+        """
+
+        self.status = SyncStatus.RUNNING
+        self.last_launch = datetime.now(UTC)
+        self.last_error = None
+
+    def mark_exited(
+        self,
+        exit_code: int,
+    ) -> None:
+        """
+        Mark the game as exited.
+        """
+
+        self.last_exit = datetime.now(UTC)
+        self.last_exit_code = exit_code
+
+        #
+        # Status will immediately become
+        # SYNCED or ERROR depending on
+        # the workflow afterwards.
+        #
 
     def mark_synced(
         self,
@@ -131,6 +164,7 @@ class GameRuntime:
         """
 
         self.status = SyncStatus.ERROR
+        self.pending_upload = False
         self.last_error = message
 
     def mark_conflict(self) -> None:

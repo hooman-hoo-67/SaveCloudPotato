@@ -7,6 +7,7 @@ and versioning game save data.
 
 from __future__ import annotations
 
+import filecmp
 import shutil
 from pathlib import Path
 
@@ -225,3 +226,97 @@ class SaveService:
             game.manifest.game_id,
             version,
         ).exists()
+
+    @staticmethod
+    def directories_equal(
+        left: Path,
+        right: Path,
+    ) -> bool:
+        """
+        Recursively compare two directories.
+
+        Returns
+        -------
+        bool
+            True if both directory trees contain the
+            same files with identical contents.
+        """
+
+        if not left.exists() or not right.exists():
+            return False
+
+        comparison = filecmp.dircmp(
+            left,
+            right,
+        )
+
+        #
+        # Missing or extra files.
+        #
+
+        if comparison.left_only or comparison.right_only or comparison.funny_files:
+            return False
+
+        #
+        # Compare common files.
+        #
+
+        matches, mismatches, errors = filecmp.cmpfiles(
+            left,
+            right,
+            comparison.common_files,
+            shallow=False,
+        )
+
+        if mismatches or errors:
+            return False
+
+        #
+        # Recurse into subdirectories.
+        #
+
+        for directory in comparison.common_dirs:
+
+            if not SaveService.directories_equal(
+                left / directory,
+                right / directory,
+            ):
+                return False
+
+        return True
+
+    @staticmethod
+    def has_changes(
+        game: Game,
+        profile: DeviceProfile,
+    ) -> bool:
+        """
+        Determine whether the working save differs
+        from the managed save.
+
+        Returns
+        -------
+        bool
+            True if changes are detected.
+        """
+
+        managed = SaveService.current_save(
+            game,
+        )
+
+        working = profile.working_save_path
+
+        #
+        # Missing directories are considered changes.
+        #
+
+        if not managed.exists():
+            return True
+
+        if not working.exists():
+            return True
+
+        return not SaveService.directories_equal(
+            managed,
+            working,
+        )

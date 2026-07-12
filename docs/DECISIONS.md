@@ -19,6 +19,10 @@ Allows:
 - Multiple storage providers
 - Conflict detection
 
+Launcher Integration Finding (Acceptance Test)
+
+Manual execution of Eden with the current command line reproduces the same behavior observed through SaveCloud: the emulator launches but does not immediately start the selected game. Since the behavior is identical outside SaveCloud, this is not considered a LaunchService defect. Emulator-specific launch semantics should be encapsulated by the Eden adapter in a future launcher integration milestone.
+
 Status
 
 Accepted

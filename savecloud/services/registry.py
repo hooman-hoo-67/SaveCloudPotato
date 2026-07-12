@@ -118,6 +118,12 @@ class RegistryService:
         if runtime.last_sync is not None:
             data["last_sync"] = runtime.last_sync.isoformat()
 
+        if runtime.last_launch is not None:
+            data["last_launch"] = runtime.last_launch.isoformat()
+
+        if runtime.last_exit is not None:
+            data["last_exit"] = runtime.last_exit.isoformat()
+
         data["created_at"] = runtime.created_at.isoformat()
 
         with RegistryService.registry_runtime_path(game_id).open(
@@ -215,10 +221,27 @@ class RegistryService:
                 runtime_data["last_sync"],
             )
 
+        last_launch = None
+
+        if runtime_data["last_launch"] is not None:
+            last_launch = datetime.fromisoformat(
+                runtime_data["last_launch"],
+            )
+
+        last_exit = None
+
+        if runtime_data["last_exit"] is not None:
+            last_exit = datetime.fromisoformat(
+                runtime_data["last_exit"],
+            )
+
         return GameRuntime(
             current_version=runtime_data["current_version"],
             last_device=runtime_data["last_device"],
             last_sync=last_sync,
+            last_launch=last_launch,
+            last_exit=last_exit,
+            last_exit_code=runtime_data["last_exit_code"],
             status=SyncStatus(runtime_data["status"]),
             pending_upload=runtime_data["pending_upload"],
             last_error=runtime_data["last_error"],

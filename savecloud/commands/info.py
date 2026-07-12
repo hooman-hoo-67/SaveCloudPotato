@@ -55,6 +55,34 @@ def info(game_id: str) -> None:
 
     typer.echo()
 
+    typer.echo("Runtime")
+    typer.echo("-------")
+    typer.echo()
+
+    typer.echo(f"Status          : {game.runtime.status.value}")
+
+    typer.echo(f"Pending Upload  : {game.runtime.pending_upload}")
+
+    typer.echo(f"Current Version : {game.runtime.current_version}")
+
+    typer.echo()
+
+    typer.echo(f"Last Device     : {game.runtime.last_device}")
+
+    typer.echo(f"Last Sync       : {game.runtime.last_sync}")
+
+    typer.echo(f"Last Launch     : {game.runtime.last_launch}")
+
+    typer.echo(f"Last Exit       : {game.runtime.last_exit}")
+
+    typer.echo(f"Exit Code       : {game.runtime.last_exit_code}")
+
+    typer.echo()
+
+    typer.echo(f"Last Error      : {game.runtime.last_error}")
+
+    typer.echo()
+
     typer.echo(f"Device          : {profile.device_name}")
 
     typer.echo(f"Working Save    : {profile.working_save_path}")

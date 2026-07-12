@@ -385,7 +385,43 @@ def main() -> None:
 
     print("✓ sync() uploaded missing remote")
 
-    section("TEST 19 - CLEANUP")
+    section("TEST 19 - NO CHANGE UPLOAD")
+
+    #
+    # Record current version.
+    #
+
+    metadata_before = SaveCloudLibrary.load_library_metadata(
+        GAME_ID,
+    )
+
+    latest_before = metadata_before.latest_version
+
+    #
+    # Upload again without modifying anything.
+    #
+
+    loaded = RegistryService.load_game(
+        GAME_ID,
+    )
+
+    SyncService.upload(
+        loaded,
+    )
+
+    #
+    # Verify no new snapshot was created.
+    #
+
+    metadata_after = SaveCloudLibrary.load_library_metadata(
+        GAME_ID,
+    )
+
+    assert metadata_after.latest_version == latest_before
+
+    print("✓ Upload skipped because no changes were detected")
+
+    section("TEST 20 - CLEANUP")
 
     cleanup(
         loaded,

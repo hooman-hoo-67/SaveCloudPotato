@@ -60,6 +60,20 @@ class SyncService:
             # Import working save into the managed library.
             #
 
+            #
+            # Determine whether anything has changed before
+            # importing the working save.
+            #
+
+            changed = SaveService.has_changes(
+                game,
+                profile,
+            )
+
+            #
+            # Import the latest working save.
+            #
+
             SaveService.import_save(
                 game,
                 profile,
@@ -68,6 +82,42 @@ class SyncService:
             SaveCloudLibrary.mark_import(
                 game.manifest.game_id,
             )
+
+            #
+            # Nothing changed.
+            #
+
+            if not changed:
+
+                # If the remote is missing, upload the managed save
+                # even though no content changes were detected.
+                if not backend.exists(
+                    game,
+                ):
+
+                    backend.upload(
+                        game,
+                    )
+
+                    game.runtime.mark_synced(
+                        SaveCloudLibrary.device_id(),
+                    )
+
+                    RegistryService.update_runtime(
+                        game,
+                    )
+
+                    return
+
+                game.runtime.mark_synced(
+                    SaveCloudLibrary.device_id(),
+                )
+
+                RegistryService.update_runtime(
+                    game,
+                )
+
+                return
 
             #
             # Create a snapshot before uploading.
