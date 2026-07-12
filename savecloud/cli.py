@@ -10,6 +10,9 @@ from savecloud.commands import export_save
 from savecloud.commands import snapshot
 from savecloud.commands import history
 from savecloud.commands import restore
+from savecloud.commands import download
+from savecloud.commands import sync
+from savecloud.commands import upload
 
 app = typer.Typer(help="Steam Cloud for everything.")
 
@@ -63,6 +66,20 @@ app.add_typer(
     name="restore",
 )
 
+app.add_typer(
+    upload.app,
+    name="upload",
+)
+
+app.add_typer(
+    download.app,
+    name="download",
+)
+
+app.add_typer(
+    sync.app,
+    name="sync",
+)
 
 if __name__ == "__main__":
     app()

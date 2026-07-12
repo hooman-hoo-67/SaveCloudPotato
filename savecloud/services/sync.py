@@ -118,9 +118,61 @@ class SyncService:
         storage backend.
         """
 
-        raise NotImplementedError(
-            "Download workflow not implemented."
+        profile = DeviceService.load_profile(
+            SaveCloudLibrary.device_id(),
+            game.manifest.game_id,
         )
+
+        backend = SyncService.backend(
+            game,
+        )
+
+        try:
+            #
+            # Download the managed save from storage.
+            #
+
+            backend.download(
+                game,
+            )
+
+            #
+            # Export the managed save back to the
+            # working] save directory.
+            #
+
+            SaveService.export_save(
+                game,
+                profile,
+            )
+
+            SaveCloudLibrary.mark_export(
+                game.manifest.game_id,
+            )
+
+            #
+            # Update runtime state.
+            #
+
+            game.runtime.mark_synced(
+                SaveCloudLibrary.device_id(),
+            )
+
+            RegistryService.update_runtime(
+                game,
+            )
+
+        except Exception as error:
+
+            game.runtime.mark_error(
+                str(error),
+            )
+
+            RegistryService.update_runtime(
+                game,
+            )
+
+            raise
 
     @staticmethod
     def sync(
@@ -131,6 +183,24 @@ class SyncService:
         storage backend.
         """
 
-        raise NotImplementedError(
-            "Synchronization workflow not implemented."
+        backend = SyncService.backend(
+            game,
+        )
+
+        if not backend.exists(
+            game,
+        ):
+            SyncService.upload(
+                game,
+            )
+            return
+
+        if game.runtime.pending_upload:
+            SyncService.upload(
+                game,
+            )
+            return
+
+        SyncService.download(
+            game,
         )

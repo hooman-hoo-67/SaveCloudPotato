@@ -169,9 +169,7 @@ def main() -> None:
     try:
         LocalStorageBackend.metadata(game)
 
-        raise AssertionError(
-            "metadata() should have raised FileNotFoundError."
-        )
+        raise AssertionError("metadata() should have raised FileNotFoundError.")
 
     except FileNotFoundError:
         print("✓ metadata() raises FileNotFoundError")

@@ -4,7 +4,6 @@ SaveCloud storage backend registry.
 
 from savecloud.storage.local import LocalStorageBackend
 
-
 SUPPORTED_BACKENDS = {
     "local": LocalStorageBackend,
 }
@@ -26,5 +25,3 @@ def backend_exists(name: str) -> bool:
     """
 
     return get_backend(name) is not None
-
-    

@@ -9,7 +9,6 @@ python tests/test_local_storage.py
 from pathlib import Path
 import shutil
 
-from savecloud.models.device_profile import DeviceProfile
 from savecloud.models.game import (
     Game,
     GameManifest,
@@ -90,13 +89,6 @@ def main() -> None:
         runtime=runtime,
     )
 
-    profile = DeviceProfile(
-        device_id=SaveCloudLibrary.device_id(),
-        device_name=SaveCloudLibrary.device_name(),
-        game_id=GAME_ID,
-        working_save_path=TEST_SAVE_DIR,
-        launch_command="steam://dummy",
-    )
 
     SaveCloudLibrary.create_game_library(game)
 

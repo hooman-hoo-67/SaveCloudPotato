@@ -172,7 +172,7 @@ class RegistryService:
             manifest=manifest,
             runtime=runtime,
         )
-        
+
     @staticmethod
     def list_games() -> list[Game]:
         """
@@ -226,9 +226,6 @@ class RegistryService:
                 runtime_data["created_at"],
             ),
         )
-
-
-
 
     @staticmethod
     def update_runtime(

@@ -194,10 +194,7 @@ def main() -> None:
 
     assert loaded.runtime.pending_upload is False
 
-    assert (
-        loaded.runtime.last_device
-        == SaveCloudLibrary.device_id()
-    )
+    assert loaded.runtime.last_device == SaveCloudLibrary.device_id()
 
     assert loaded.runtime.last_sync is not None
 
@@ -230,12 +227,165 @@ def main() -> None:
     assert metadata.last_import is not None
 
     print("✓ Metadata updated")
+    section("TEST 11 - MODIFY WORKING SAVE")
+
+    (working_save / "save.dat").write_text(
+        "Modified Save",
+        encoding="utf-8",
+    )
+
+    assert (working_save / "save.dat").read_text(
+        encoding="utf-8",
+    ) == "Modified Save"
+
+    print("✓ Working save modified")
+
+    section("TEST 12 - DOWNLOAD")
+
+    loaded = RegistryService.load_game(
+        GAME_ID,
+    )
+
+    SyncService.download(
+        loaded,
+    )
+
+    print("✓ Download completed")
+
+    section("TEST 13 - VERIFY WORKING SAVE")
+
+    contents = (working_save / "save.dat").read_text(
+        encoding="utf-8",
+    )
+
+    assert contents == "SaveCloud Test Save"
+
+    print("✓ Working save restored")
+
+    section("TEST 14 - VERIFY RUNTIME")
+
+    loaded = RegistryService.load_game(
+        GAME_ID,
+    )
+
+    assert loaded.runtime.status == SyncStatus.SYNCED
+
+    assert loaded.runtime.pending_upload is False
+
+    assert loaded.runtime.last_device == SaveCloudLibrary.device_id()
+
+    assert loaded.runtime.last_sync is not None
+
+    print("✓ Runtime updated")
+
+    section("TEST 15 - VERIFY EXPORT METADATA")
+
+    metadata = SaveCloudLibrary.load_library_metadata(
+        GAME_ID,
+    )
+
+    assert metadata.last_export is not None
+
+    print("✓ Export metadata updated")
+
+    section("TEST 16 - SYNC DOWNLOAD PATH")
 
     #
-    # Cleanup
+    # Working save currently contains the remote contents.
+    # Change it so we can verify sync() restores it.
     #
 
-    section("TEST 11 - CLEANUP")
+    (working_save / "save.dat").write_text(
+        "Modified Again",
+        encoding="utf-8",
+    )
+
+    loaded = RegistryService.load_game(
+        GAME_ID,
+    )
+
+    SyncService.sync(
+        loaded,
+    )
+
+    contents = (working_save / "save.dat").read_text(
+        encoding="utf-8",
+    )
+
+    assert contents == "SaveCloud Test Save"
+
+    print("✓ sync() selected download()")
+
+    section("TEST 17 - SYNC UPLOAD PATH")
+
+    #
+    # Modify the working save.
+    #
+
+    (working_save / "save.dat").write_text(
+        "Newest Save",
+        encoding="utf-8",
+    )
+
+    loaded = RegistryService.load_game(
+        GAME_ID,
+    )
+
+    loaded.runtime.mark_pending()
+
+    RegistryService.update_runtime(
+        loaded,
+    )
+
+    SyncService.sync(
+        loaded,
+    )
+
+    #
+    # Download immediately afterwards to verify the
+    # remote was updated.
+    #
+
+    SyncService.download(
+        loaded,
+    )
+
+    contents = (working_save / "save.dat").read_text(
+        encoding="utf-8",
+    )
+
+    assert contents == "Newest Save"
+
+    loaded = RegistryService.load_game(
+        GAME_ID,
+    )
+
+    assert loaded.runtime.status == SyncStatus.SYNCED
+    assert loaded.runtime.pending_upload is False
+
+    print("✓ sync() selected upload()")
+
+    section("TEST 18 - MISSING REMOTE")
+
+    LocalStorageBackend.delete(
+        loaded,
+    )
+
+    assert not LocalStorageBackend.exists(
+        loaded,
+    )
+
+    SyncService.sync(
+        loaded,
+    )
+
+    assert LocalStorageBackend.exists(
+        loaded,
+    )
+
+    print("✓ sync() uploaded missing remote")
+
+    section("TEST 19 - CLEANUP")
 
     cleanup(
         loaded,

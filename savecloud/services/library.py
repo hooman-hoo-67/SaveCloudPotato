@@ -247,7 +247,7 @@ class SaveCloudLibrary:
     ) -> None:
         """
         Update the last import timestamp.
-        """ 
+        """
 
         metadata = SaveCloudLibrary.load_library_metadata(
             game_id,
@@ -282,6 +282,7 @@ class SaveCloudLibrary:
             game_id,
             metadata,
         )
+
     @staticmethod
     def set_current_version(
         game_id: str,
@@ -327,5 +328,3 @@ class SaveCloudLibrary:
         )
 
         return metadata.latest_version
-
-        

@@ -141,7 +141,6 @@ class GameRuntime:
         self.status = SyncStatus.CONFLICT
 
 
-
 #
 # Game
 #

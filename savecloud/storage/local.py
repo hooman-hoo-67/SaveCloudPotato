@@ -11,6 +11,7 @@ from savecloud.models.game import Game
 from savecloud.services.library import SaveCloudLibrary
 from datetime import datetime
 
+
 class LocalStorageBackend:
     """
     Local folder storage backend.
@@ -163,9 +164,7 @@ class LocalStorageBackend:
         )
 
         if not directory.exists():
-            raise FileNotFoundError(
-                f"Remote save does not exist: {directory}"
-            )
+            raise FileNotFoundError(f"Remote save does not exist: {directory}")
 
         stat = directory.stat()
 

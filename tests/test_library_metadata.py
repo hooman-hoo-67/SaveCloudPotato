@@ -160,9 +160,8 @@ def main() -> None:
 
     print("✓ Export timestamp updated")
 
-
     section("TEST 9 - SET CURRENT VERSION")
-    
+
     SaveCloudLibrary.set_current_version(
         GAME_ID,
         42,
@@ -200,7 +199,6 @@ def main() -> None:
 
     print("✓ Latest version incremented")
 
-
     section("TEST 11 - CLEANUP")
 
     SaveCloudLibrary.delete_game_library(GAME_ID)
@@ -212,4 +210,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
