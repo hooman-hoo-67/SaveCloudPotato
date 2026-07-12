@@ -25,11 +25,6 @@ from savecloud.adapters import (
     get_adapter,
 )
 
-from savecloud.storage import (
-    backend_exists,
-    SUPPORTED_BACKENDS,
-)
-
 
 def choose_enum(
     enum_type: type[Enum],
@@ -135,23 +130,6 @@ def register() -> None:
     storage_backend = prompt_required(
         "Storage backend",
     )
-
-    storage_backend = storage_backend.strip().lower()
-
-    if not backend_exists(storage_backend):
-        typer.secho(
-            f'Unsupported storage backend: "{storage_backend}".',
-            fg=typer.colors.RED,
-        )
-
-        typer.echo("Supported storage backends:")
-
-        for name in SUPPORTED_BACKENDS:
-            typer.echo(f"  - {name}")
-
-        raise typer.Exit(
-            code=1,
-        )
 
     if adapter == "eden":
         title_id = prompt_required(

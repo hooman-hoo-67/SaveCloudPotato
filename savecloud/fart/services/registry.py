@@ -62,7 +62,7 @@ class RegistryService:
 
         RegistryService.save_registry_manifest(game.manifest)
 
-        RegistryService.save_runtime(
+        RegistryService.save_registry_runtime(
             game.manifest.game_id,
             game.runtime,
         )
@@ -101,7 +101,7 @@ class RegistryService:
             json.dump(data, file, indent=4)
 
     @staticmethod
-    def save_runtime(
+    def save_registry_runtime(
         game_id: str,
         runtime: GameRuntime,
     ) -> None:
@@ -126,22 +126,17 @@ class RegistryService:
             json.dump(data, file, indent=4)
 
     @staticmethod
-    def load_manifest(
-        game_id: str,
-    ) -> GameManifest:
+    def load_game(game_id: str) -> Game:
         """
-        Load a GameManifest from the registry.
+        Load a Game from the registry.
         """
 
-        with RegistryService.registry_manifest_path(
-            game_id,
-        ).open(
-            "r",
-            encoding="utf-8",
+        with RegistryService.registry_manifest_path(game_id).open(
+            "r", encoding="utf-8"
         ) as file:
             manifest_data = json.load(file)
 
-        return GameManifest(
+        manifest = GameManifest(
             game_id=manifest_data["game_id"],
             display_name=manifest_data["display_name"],
             launch_type=LaunchType(manifest_data["launch_type"]),
@@ -152,27 +147,31 @@ class RegistryService:
             sync_enabled=manifest_data["sync_enabled"],
         )
 
-    @staticmethod
-    def load_game(
-        game_id: str,
-    ) -> Game:
-        """
-        Load a Game from the registry.
-        """
+        with RegistryService.registry_runtime_path(game_id).open(
+            "r", encoding="utf-8"
+        ) as file:
+            runtime_data = json.load(file)
 
-        manifest = RegistryService.load_manifest(
-            game_id,
-        )
+        last_sync = None
 
-        runtime = RegistryService.load_runtime(
-            game_id,
+        if runtime_data["last_sync"] is not None:
+            last_sync = datetime.fromisoformat(runtime_data["last_sync"])
+
+        runtime = GameRuntime(
+            current_version=runtime_data["current_version"],
+            last_device=runtime_data["last_device"],
+            last_sync=last_sync,
+            status=SyncStatus(runtime_data["status"]),
+            pending_upload=runtime_data["pending_upload"],
+            last_error=runtime_data["last_error"],
+            created_at=datetime.fromisoformat(runtime_data["created_at"]),
         )
 
         return Game(
             manifest=manifest,
             runtime=runtime,
         )
-        
+
     @staticmethod
     def list_games() -> list[Game]:
         """
@@ -191,54 +190,3 @@ class RegistryService:
             games.append(RegistryService.load_game(directory.name))
 
         return games
-
-    @staticmethod
-    def load_runtime(
-        game_id: str,
-    ) -> GameRuntime:
-        """
-        Load a GameRuntime from the registry.
-        """
-
-        with RegistryService.registry_runtime_path(
-            game_id,
-        ).open(
-            "r",
-            encoding="utf-8",
-        ) as file:
-            runtime_data = json.load(file)
-
-        last_sync = None
-
-        if runtime_data["last_sync"] is not None:
-            last_sync = datetime.fromisoformat(
-                runtime_data["last_sync"],
-            )
-
-        return GameRuntime(
-            current_version=runtime_data["current_version"],
-            last_device=runtime_data["last_device"],
-            last_sync=last_sync,
-            status=SyncStatus(runtime_data["status"]),
-            pending_upload=runtime_data["pending_upload"],
-            last_error=runtime_data["last_error"],
-            created_at=datetime.fromisoformat(
-                runtime_data["created_at"],
-            ),
-        )
-
-
-
-
-    @staticmethod
-    def update_runtime(
-        game: Game,
-    ) -> None:
-        """
-        Save a game's runtime.
-        """
-
-        RegistryService.save_runtime(
-            game.manifest.game_id,
-            game.runtime,
-        )

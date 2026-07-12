@@ -132,11 +132,76 @@ def main() -> None:
 
     print("✓ Version path generated")
 
+    section("TEST 7 - MARK IMPORT")
+
+    SaveCloudLibrary.mark_import(
+        GAME_ID,
+    )
+
+    metadata = SaveCloudLibrary.load_library_metadata(
+        GAME_ID,
+    )
+
+    assert metadata.last_import is not None
+
+    print("✓ Import timestamp updated")
+
+    section("TEST 8 - MARK EXPORT")
+
+    SaveCloudLibrary.mark_export(
+        GAME_ID,
+    )
+
+    metadata = SaveCloudLibrary.load_library_metadata(
+        GAME_ID,
+    )
+
+    assert metadata.last_export is not None
+
+    print("✓ Export timestamp updated")
+
+
+    section("TEST 9 - SET CURRENT VERSION")
+    
+    SaveCloudLibrary.set_current_version(
+        GAME_ID,
+        42,
+    )
+
+    metadata = SaveCloudLibrary.load_library_metadata(
+        GAME_ID,
+    )
+
+    assert metadata.current_version == 42
+
+    print("✓ Current version updated")
     #
     # Cleanup
     #
 
-    section("TEST 7 - CLEANUP")
+    section("TEST 10 - INCREMENT LATEST VERSION")
+
+    metadata = SaveCloudLibrary.load_library_metadata(
+        GAME_ID,
+    )
+
+    previous = metadata.latest_version
+
+    new = SaveCloudLibrary.increment_latest_version(
+        GAME_ID,
+    )
+
+    metadata = SaveCloudLibrary.load_library_metadata(
+        GAME_ID,
+    )
+
+    assert new == previous + 1
+    assert metadata.latest_version == previous + 1
+
+    print("✓ Latest version incremented")
+
+
+    section("TEST 11 - CLEANUP")
 
     SaveCloudLibrary.delete_game_library(GAME_ID)
 
@@ -147,3 +212,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

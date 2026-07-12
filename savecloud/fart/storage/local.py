@@ -9,7 +9,7 @@ from pathlib import Path
 
 from savecloud.models.game import Game
 from savecloud.services.library import SaveCloudLibrary
-from datetime import datetime
+
 
 class LocalStorageBackend:
     """
@@ -113,64 +113,3 @@ class LocalStorageBackend:
             source,
             destination,
         )
-
-    @staticmethod
-    def exists(
-        game: Game,
-    ) -> bool:
-        """
-        Return True if remote storage exists for this game.
-        """
-
-        return (
-            LocalStorageBackend.game_directory(
-                game.manifest.game_id,
-            )
-            / "current"
-        ).exists()
-
-    @staticmethod
-    def delete(
-        game: Game,
-    ) -> None:
-        """
-        Delete the remote save.
-        """
-
-        directory = (
-            LocalStorageBackend.game_directory(
-                game.manifest.game_id,
-            )
-            / "current"
-        )
-
-        if directory.exists():
-            shutil.rmtree(directory)
-
-    @staticmethod
-    def metadata(
-        game: Game,
-    ) -> dict:
-        """
-        Return metadata describing the remote save.
-        """
-
-        directory = (
-            LocalStorageBackend.game_directory(
-                game.manifest.game_id,
-            )
-            / "current"
-        )
-
-        if not directory.exists():
-            raise FileNotFoundError(
-                f"Remote save does not exist: {directory}"
-            )
-
-        stat = directory.stat()
-
-        return {
-            "modified": datetime.fromtimestamp(
-                stat.st_mtime,
-            ),
-        }
