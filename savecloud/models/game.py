@@ -99,6 +99,48 @@ class GameRuntime:
 
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
+    def mark_pending(self) -> None:
+        """
+        Mark the game as having pending changes.
+        """
+
+        self.status = SyncStatus.PENDING
+        self.pending_upload = True
+        self.last_error = None
+
+    def mark_synced(
+        self,
+        device_id: str,
+    ) -> None:
+        """
+        Mark the game as synchronized.
+        """
+
+        self.status = SyncStatus.SYNCED
+        self.pending_upload = False
+        self.last_error = None
+        self.last_device = device_id
+        self.last_sync = datetime.now(UTC)
+
+    def mark_error(
+        self,
+        message: str,
+    ) -> None:
+        """
+        Mark the runtime as being in an error state.
+        """
+
+        self.status = SyncStatus.ERROR
+        self.last_error = message
+
+    def mark_conflict(self) -> None:
+        """
+        Mark the runtime as being in conflict.
+        """
+
+        self.status = SyncStatus.CONFLICT
+
+
 
 #
 # Game
