@@ -7,8 +7,9 @@ lifecycle.
 
 from __future__ import annotations
 
-import shlex
 import subprocess
+
+from savecloud.launchers import LauncherRegistry
 
 from savecloud.models.device_profile import DeviceProfile
 
@@ -36,12 +37,24 @@ class LaunchService:
             Running process.
         """
 
-        command = shlex.split(
-            profile.launch_command,
+        launcher = LauncherRegistry.get(
+            profile.launcher,
         )
 
-        return subprocess.Popen(
-            command,
+        if launcher is None:
+            raise RuntimeError(
+                "Native launcher is not registered.",
+            )
+
+        if not launcher.validate(
+            profile.launch_command,
+        ):
+            raise ValueError(
+                "Invalid launch command.",
+            )
+
+        return launcher.launch(
+            profile.launch_command,
         )
 
     @staticmethod

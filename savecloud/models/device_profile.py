@@ -48,7 +48,7 @@ class DeviceProfile:
     #
 
     launch_command: str
-
+    launcher: str = "native"
     #
     # Local synchronization state
     #

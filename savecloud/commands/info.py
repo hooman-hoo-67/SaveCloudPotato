@@ -88,3 +88,4 @@ def info(game_id: str) -> None:
     typer.echo(f"Working Save    : {profile.working_save_path}")
 
     typer.echo(f"Launch Command  : {profile.launch_command}")
+    typer.echo(f"Launcher        : {profile.launcher}")

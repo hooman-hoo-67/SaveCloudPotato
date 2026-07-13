@@ -19,10 +19,8 @@ from savecloud.services.device import DeviceService
 from savecloud.services.library import SaveCloudLibrary
 from savecloud.services.registry import RegistryService
 
-from savecloud.storage import (
-    backend_exists,
-    SUPPORTED_BACKENDS,
-)
+
+from savecloud.launchers import LauncherRegistry
 
 
 def choose_enum(
@@ -52,6 +50,38 @@ def choose_enum(
 
         if 1 <= choice <= len(members):
             return members[choice - 1]
+
+        typer.secho(
+            "Invalid selection. Try again.",
+            fg=typer.colors.RED,
+        )
+
+
+def choose_option(
+    options: list[str],
+    title: str,
+) -> str:
+    """
+    Prompt the user to choose from a list of options.
+    """
+
+    typer.echo()
+    typer.echo(title)
+
+    for index, option in enumerate(
+        options,
+        start=1,
+    ):
+        typer.echo(f"{index}. {option}")
+
+    while True:
+        choice = typer.prompt(
+            "Choice",
+            type=int,
+        )
+
+        if 1 <= choice <= len(options):
+            return options[choice - 1]
 
         typer.secho(
             "Invalid selection. Try again.",
@@ -101,51 +131,21 @@ def register() -> None:
         "Select platform",
     )
 
-    adapter = (
-        prompt_required(
-            "Adapter",
-        )
-        .strip()
-        .lower()
+    adapter = choose_option(
+        AdapterRegistry.names(),
+        "Select adapter",
     )
 
-    if not AdapterRegistry.exists(adapter):
-        typer.secho(
-            f'Unsupported adapter: "{adapter}".',
-            fg=typer.colors.RED,
-        )
-
-        typer.echo("Supported adapters:")
-
-        for name in AdapterRegistry.names():
-            typer.echo(f"  - {name}")
-
-        raise typer.Exit(
-            code=1,
-        )
-
-    adapter_class = AdapterRegistry.get(adapter)
-
-    storage_backend = prompt_required(
-        "Storage backend",
+    adapter_class = AdapterRegistry.get(
+        adapter,
     )
 
-    storage_backend = storage_backend.strip().lower()
+    assert adapter_class is not None
 
-    if not backend_exists(storage_backend):
-        typer.secho(
-            f'Unsupported storage backend: "{storage_backend}".',
-            fg=typer.colors.RED,
-        )
-
-        typer.echo("Supported storage backends:")
-
-        for name in SUPPORTED_BACKENDS:
-            typer.echo(f"  - {name}")
-
-        raise typer.Exit(
-            code=1,
-        )
+    storage_backend = choose_option(
+        ["local"],
+        "Select storage backend",
+    )
 
     identifier = adapter_class.prompt_identifier()
 
@@ -162,17 +162,23 @@ def register() -> None:
         raise typer.Exit(
             code=1,
         )
-        if not adapter_class.validate_save(
-            working_save_path,
-        ):
-            typer.secho(
-                f"{adapter_class.display_name()} save directory is invalid.",
-                fg=typer.colors.RED,
-            )
 
-            raise typer.Exit(
-                code=1,
-            )
+    if not adapter_class.validate_save(
+        working_save_path,
+    ):
+        typer.secho(
+            f"{adapter_class.display_name()} save directory is invalid.",
+            fg=typer.colors.RED,
+        )
+
+        raise typer.Exit(
+            code=1,
+        )
+
+    selected_launcher = choose_option(
+        LauncherRegistry.names(),
+        "Select launcher",
+    )
 
     launch_command = prompt_required(
         "Launch command",
@@ -200,6 +206,7 @@ def register() -> None:
         game_id=game_id,
         working_save_path=working_save_path,
         launch_command=launch_command,
+        launcher=selected_launcher,
     )
 
     if RegistryService.exists(

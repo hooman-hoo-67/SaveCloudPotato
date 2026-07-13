@@ -6,6 +6,8 @@ Allows the user to specify any save directory manually.
 
 from __future__ import annotations
 
+import typer
+
 from pathlib import Path
 
 from savecloud.adapters.base import BaseAdapter
@@ -52,3 +54,13 @@ class ManualAdapter(BaseAdapter):
     @staticmethod
     def supports_auto_discovery() -> bool:
         return False
+
+    @staticmethod
+    def prompt_identifier() -> str:
+        """
+        Prompt the user for a save directory.
+        """
+
+        return typer.prompt(
+            "Save Folder",
+        ).strip()
