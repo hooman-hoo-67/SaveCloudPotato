@@ -16,22 +16,37 @@ Every save passes through the SaveCloud Library.
 
 ## Components
 
-- SaveCloud CLI
-- SaveCloud Library
-- Storage Backend
-- Backup Manager
-- Metadata Manager
-- Emulator/Game Adapters
-- Steam Integration
+CLI
+│
+▼
+Services
+│
+├── RegistryService
+├── LibraryService
+├── DeviceService
+├── SyncService
+├── AutoSyncService
+└── LaunchService
+│
+├──────────────┐
+▼              ▼
+Adapters    Launchers
+│              │
+▼              ▼
+Storage Backends
+│
+▼
+SaveCloud Library
 
 ## Storage Backends
 
 Current:
 
-- Syncthing
+- Local
 
 Planned:
 
+- Syncthing
 - Google Drive
 - Dropbox
 - Nextcloud

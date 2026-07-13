@@ -26,3 +26,16 @@ Manual execution of Eden with the current command line reproduces the same behav
 Status
 
 Accepted
+
+Decision
+
+Adapters are responsible only for save discovery
+and save validation.
+
+They never launch games.
+
+Decision
+
+Launch methods are encapsulated by launchers.
+
+Launchers are independent of emulators.

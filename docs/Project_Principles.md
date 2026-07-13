@@ -19,3 +19,5 @@
 9. Device-specific information should never be synchronized.
 
 10. The system should continue functioning if any storage backend is unavailable.
+
+11. Adapters and launchers should remain independent abstractions.

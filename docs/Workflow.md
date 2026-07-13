@@ -13,19 +13,39 @@ savecloud register
 
 ↓
 
-Select Steam Game
+Display Name
 
 ↓
 
-Select Save Folder
+Game ID
 
 ↓
 
-Select Storage Backend
+Launch Type
 
 ↓
 
-Create Library
+Platform
+
+↓
+
+Adapter
+
+↓
+
+Storage Backend
+
+↓
+
+Launcher
+
+↓
+
+Launch Command
+
+↓
+
+Adapter discovers save
 
 ↓
 
@@ -33,11 +53,7 @@ Create Registry
 
 ↓
 
-Create Device Configuration
-
-↓
-
-Done
+Create Device Profile
 ```
 
 ---
@@ -49,36 +65,27 @@ Steam
 
 ↓
 
-SaveCloud Launcher
+SaveCloud CLI
 
 ↓
 
-Read manifest.json
+Registry
 
 ↓
 
-Read runtime.json
+Device Profile
 
 ↓
 
-Read Device Configuration
+Launcher Registry
 
 ↓
 
-Import latest save from Library
+Selected Launcher
 
 ↓
 
-Create Backup
-
-↓
-
-Copy save to Working Save Folder
-
-↓
-
-Launch Game
-```
+Game Process
 
 ---
 

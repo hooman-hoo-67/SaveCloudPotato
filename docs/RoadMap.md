@@ -1,5 +1,35 @@
 # Roadmap
 
+Milestone 1
+✓ Library
+
+Milestone 2
+✓ Registry
+
+Milestone 3
+✓ Sync
+
+Milestone 4
+✓ AutoSync
+
+Milestone 5
+✓ Adapter Framework
+
+Milestone 6
+✓ Launcher Framework
+
+Milestone 7
+□ LaunchConfig
+
+Milestone 8
+□ Steam Adapter
+
+Milestone 9
+□ Syncthing
+
+Milestone 10
+□ Cloudsave
+
 ## MVP
 
 - [ ] CLI
