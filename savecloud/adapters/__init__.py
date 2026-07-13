@@ -2,26 +2,67 @@
 SaveCloud adapter registry.
 """
 
+from __future__ import annotations
+
+from savecloud.adapters.base import BaseAdapter
 from savecloud.adapters.eden import EdenAdapter
-
-SUPPORTED_ADAPTERS = {
-    "eden": EdenAdapter,
-}
+from savecloud.adapters.manual import ManualAdapter
 
 
-def get_adapter(name: str):
+class AdapterRegistry:
     """
-    Return the adapter class for an adapter name.
+    Registry of all supported adapters.
     """
 
-    return SUPPORTED_ADAPTERS.get(
-        name.lower(),
-    )
+    _ADAPTERS: dict[str, type[BaseAdapter]] = {
+        "eden": EdenAdapter,
+        "manual": ManualAdapter,
+    }
 
+    @classmethod
+    def get(
+        cls,
+        name: str,
+    ) -> type[BaseAdapter] | None:
+        """
+        Return an adapter class.
+        """
 
-def adapter_exists(name: str) -> bool:
-    """
-    Return True if an adapter exists.
-    """
+        return cls._ADAPTERS.get(
+            name.lower(),
+        )
 
-    return get_adapter(name) is not None
+    @classmethod
+    def exists(
+        cls,
+        name: str,
+    ) -> bool:
+        """
+        Return whether an adapter exists.
+        """
+
+        return cls.get(name) is not None
+
+    @classmethod
+    def names(
+        cls,
+    ) -> list[str]:
+        """
+        Return all adapter names.
+        """
+
+        return sorted(
+            cls._ADAPTERS.keys(),
+        )
+
+    @classmethod
+    def adapters(
+        cls,
+    ) -> dict[str, type[BaseAdapter]]:
+        """
+        Return the adapter mapping.
+        """
+
+        return dict(
+            cls._ADAPTERS,
+        )

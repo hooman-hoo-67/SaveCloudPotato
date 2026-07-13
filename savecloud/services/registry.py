@@ -223,14 +223,14 @@ class RegistryService:
 
         last_launch = None
 
-        if runtime_data["last_launch"] is not None:
+        if runtime_data.get("last_launch") is not None:
             last_launch = datetime.fromisoformat(
                 runtime_data["last_launch"],
             )
 
         last_exit = None
 
-        if runtime_data["last_exit"] is not None:
+        if runtime_data.get("last_exit") is not None:
             last_exit = datetime.fromisoformat(
                 runtime_data["last_exit"],
             )
@@ -241,7 +241,7 @@ class RegistryService:
             last_sync=last_sync,
             last_launch=last_launch,
             last_exit=last_exit,
-            last_exit_code=runtime_data["last_exit_code"],
+            last_exit_code=runtime_data.get("last_exit_code"),
             status=SyncStatus(runtime_data["status"]),
             pending_upload=runtime_data["pending_upload"],
             last_error=runtime_data["last_error"],

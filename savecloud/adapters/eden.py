@@ -6,8 +6,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from savecloud.adapters.base import BaseAdapter
+import typer
 
-class EdenAdapter:
+
+class EdenAdapter(BaseAdapter):
     """
     SaveCloud adapter for the Eden emulator.
     """
@@ -31,13 +34,21 @@ class EdenAdapter:
         return path.exists() and path.is_dir()
 
     @staticmethod
-    def locate_save() -> Path | None:
+    def locate_save(
+        identifier: str,
+    ) -> Path | None:
         """
-        Attempt to locate the default Eden save
-        directory.
+        Attempt to locate a save directory for the
+        given identifier.
+        """
 
-        Automatic discovery is not implemented yet.
-        """
+        title_id = identifier
+
+        for user in EdenAdapter.find_users():
+            candidate = user / title_id
+
+            if candidate.exists() and candidate.is_dir():
+                return candidate
 
         return None
 
@@ -62,19 +73,22 @@ class EdenAdapter:
 
         return [path for path in users_root.iterdir() if path.is_dir()]
 
-    @staticmethod
-    def find_save(
-        title_id: str,
-    ) -> Path | None:
-        """
-        Attempt to locate a save directory for the
-        given title ID.
-        """
-
-        for user in EdenAdapter.find_users():
-            candidate = user / title_id
-
-            if candidate.exists() and candidate.is_dir():
-                return candidate
-
         return None
+
+    @staticmethod
+    def identifier_name() -> str:
+        return "Title ID"
+
+    @staticmethod
+    def prompt_identifier() -> str:
+        """
+        Prompt the user for an Eden Title ID.
+        """
+
+        return typer.prompt(
+            "Title ID",
+        ).strip()
+
+    @staticmethod
+    def supports_auto_discovery() -> bool:
+        return True

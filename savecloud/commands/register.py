@@ -2,12 +2,11 @@
 Register a game with SaveCloud.
 """
 
-from pathlib import Path
 from enum import Enum
 
 import typer
 
-from savecloud.adapters import SUPPORTED_ADAPTERS
+from savecloud.adapters import AdapterRegistry
 from savecloud.models.device_profile import DeviceProfile
 from savecloud.models.game import (
     Game,
@@ -19,11 +18,6 @@ from savecloud.models.game import (
 from savecloud.services.device import DeviceService
 from savecloud.services.library import SaveCloudLibrary
 from savecloud.services.registry import RegistryService
-
-from savecloud.adapters import (
-    adapter_exists,
-    get_adapter,
-)
 
 from savecloud.storage import (
     backend_exists,
@@ -115,7 +109,7 @@ def register() -> None:
         .lower()
     )
 
-    if not adapter_exists(adapter):
+    if not AdapterRegistry.exists(adapter):
         typer.secho(
             f'Unsupported adapter: "{adapter}".',
             fg=typer.colors.RED,
@@ -123,14 +117,14 @@ def register() -> None:
 
         typer.echo("Supported adapters:")
 
-        for name in SUPPORTED_ADAPTERS:
+        for name in AdapterRegistry.names():
             typer.echo(f"  - {name}")
 
         raise typer.Exit(
             code=1,
         )
 
-    adapter_class = get_adapter(adapter)
+    adapter_class = AdapterRegistry.get(adapter)
 
     storage_backend = prompt_required(
         "Storage backend",
@@ -153,41 +147,32 @@ def register() -> None:
             code=1,
         )
 
-    if adapter == "eden":
-        title_id = prompt_required(
-            "Title ID",
-        )
+    identifier = adapter_class.prompt_identifier()
 
-        working_save_path = adapter_class.find_save(
-            title_id,
-        )
+    working_save_path = adapter_class.locate_save(
+        identifier,
+    )
 
-        if working_save_path is None:
-            typer.secho(
-                f"Save directory for title ID '{title_id}' not found.",
-                fg=typer.colors.RED,
-            )
-            raise typer.Exit(
-                code=1,
-            )
-    else:
-        working_save_path = Path(
-            prompt_required(
-                "Working save path",
-            )
-        )
-
-    if not adapter_class.validate_save(
-        working_save_path,
-    ):
+    if working_save_path is None:
         typer.secho(
-            f"{adapter_class.display_name()} save directory is invalid.",
+            "Unable to locate save directory.",
             fg=typer.colors.RED,
         )
 
         raise typer.Exit(
             code=1,
         )
+        if not adapter_class.validate_save(
+            working_save_path,
+        ):
+            typer.secho(
+                f"{adapter_class.display_name()} save directory is invalid.",
+                fg=typer.colors.RED,
+            )
+
+            raise typer.Exit(
+                code=1,
+            )
 
     launch_command = prompt_required(
         "Launch command",
