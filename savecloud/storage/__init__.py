@@ -2,14 +2,14 @@
 Storage backend registry.
 """
 
-from savecloud.storage.registry import (
-    SUPPORTED_BACKENDS,
-    backend_exists,
-    get_backend,
-)
+from savecloud.storage.base import BaseStorageBackend
+from savecloud.storage.local import LocalStorageBackend
+from savecloud.storage.registry import StorageRegistry
+from savecloud.storage.syncthing import SyncthingStorageBackend
 
-__all__ = (
-    "SUPPORTED_BACKENDS",
-    "backend_exists",
-    "get_backend",
-)
+__all__ = [
+    "BaseStorageBackend",
+    "LocalStorageBackend",
+    "SyncthingStorageBackend",
+    "StorageRegistry",
+]

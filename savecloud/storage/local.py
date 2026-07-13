@@ -11,19 +11,44 @@ from savecloud.models.game import Game
 from savecloud.services.library import SaveCloudLibrary
 from datetime import datetime
 
+from savecloud.storage.base import BaseStorageBackend
+from savecloud.storage.registry import StorageRegistry
 
-class LocalStorageBackend:
+from savecloud.services.configuration import (
+    ConfigurationService,
+)
+
+
+class LocalStorageBackend(
+    BaseStorageBackend,
+):
     """
     Local folder storage backend.
     """
 
     @staticmethod
-    def storage_root() -> Path:
+    def display_name() -> str:
         """
-        Return the root directory for local storage.
+        Return the backend display name.
         """
 
-        return Path.home() / "SaveCloudRemote"
+        return "Local"
+
+    @staticmethod
+    def validate() -> bool:
+        """
+        Validate the backend configuration.
+        """
+
+        return True
+
+    @staticmethod
+    def storage_root() -> Path:
+        """
+        Return the configured storage root.
+        """
+
+        return ConfigurationService.load().storage_root
 
     @staticmethod
     def game_directory(
@@ -173,3 +198,9 @@ class LocalStorageBackend:
                 stat.st_mtime,
             ),
         }
+
+
+StorageRegistry.register(
+    "local",
+    LocalStorageBackend,
+)

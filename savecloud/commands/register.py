@@ -19,6 +19,7 @@ from savecloud.services.device import DeviceService
 from savecloud.services.library import SaveCloudLibrary
 from savecloud.services.registry import RegistryService
 
+from savecloud.storage import StorageRegistry
 
 from savecloud.launchers import LauncherRegistry
 
@@ -143,9 +144,25 @@ def register() -> None:
     assert adapter_class is not None
 
     storage_backend = choose_option(
-        ["local"],
+        StorageRegistry.names(),
         "Select storage backend",
     )
+
+    backend_class = StorageRegistry.get(
+        storage_backend,
+    )
+
+    assert backend_class is not None
+
+    if not backend_class.validate():
+        typer.secho(
+            f"{backend_class.display_name()} is not configured correctly.",
+            fg=typer.colors.RED,
+        )
+
+        raise typer.Exit(
+            code=1,
+        )
 
     identifier = adapter_class.prompt_identifier()
 

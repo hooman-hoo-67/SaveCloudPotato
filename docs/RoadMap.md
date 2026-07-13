@@ -21,14 +21,55 @@ Milestone 6
 Milestone 7
 □ LaunchConfig
 
-Milestone 8
-□ Steam Adapter
+Milestone 8 — Installation Configuration
+□ InstallationConfig
+□ config.json
+□ Storage root
+□ Default storage backend
+□ CLI to configure it
+□ Remove storage_backend from GameManifest
 
-Milestone 9
-□ Syncthing
+Milestone 9 — Filesystem Synchronization
+□ Filesystem backend uses configured root
+□ Syncthing backend validates installation
+□ Multi-device acceptance test
+□ Desktop ↔ Steam Deck working
 
-Milestone 10
-□ Cloudsave
+Milestone 10 — Cloud Providers
+□ Google Drive API
+□ Dropbox API
+□ OneDrive API
+□ S3/WebDAV
+
+Milestone 11 — Platform Integration
+
+Adapters
+□ Steam
+□ Eden
+
+Launchers
+□ Steam
+□ Heroic
+□ Lutris
+□ Flatpak
+□ Native executable
+□ AppImage
+
+
+Milestone 12 — Automation and Integration
+
+
+Decky plugin
+Millennium plugin
+Steam shortcuts
+Big Picture integration
+Steam launch hooks
+Auto-registration
+Overlay notifications
+Background synchronization
+
+Milestone 13 — Quality of Life
+
 
 ## MVP
 

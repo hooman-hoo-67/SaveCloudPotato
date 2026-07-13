@@ -2,26 +2,79 @@
 SaveCloud storage backend registry.
 """
 
-from savecloud.storage.local import LocalStorageBackend
+from __future__ import annotations
 
-SUPPORTED_BACKENDS = {
-    "local": LocalStorageBackend,
-}
+from typing import Type
+
+from savecloud.storage.base import BaseStorageBackend
+from savecloud.models.game import Game
 
 
-def get_backend(name: str):
+class StorageRegistry:
     """
-    Return the backend class for a backend name.
-    """
-
-    return SUPPORTED_BACKENDS.get(
-        name.lower(),
-    )
-
-
-def backend_exists(name: str) -> bool:
-    """
-    Return True if a backend exists.
+    Registry of available storage backends.
     """
 
-    return get_backend(name) is not None
+    _backends: dict[
+        str,
+        Type[BaseStorageBackend],
+    ] = {}
+
+    @staticmethod
+    def register(
+        name: str,
+        backend: Type[BaseStorageBackend],
+    ) -> None:
+        """
+        Register a storage backend.
+        """
+
+        StorageRegistry._backends[name.lower()] = backend
+
+    @staticmethod
+    def get(
+        name: str,
+    ) -> Type[BaseStorageBackend] | None:
+        """
+        Return a storage backend.
+        """
+
+        return StorageRegistry._backends.get(
+            name.lower(),
+        )
+
+    @staticmethod
+    def exists(
+        name: str,
+    ) -> bool:
+        """
+        Return True if the backend exists.
+        """
+
+        return name.lower() in StorageRegistry._backends
+
+    @staticmethod
+    def names() -> list[str]:
+        """
+        Return registered backend names.
+        """
+
+        return sorted(
+            StorageRegistry._backends.keys(),
+        )
+
+    @staticmethod
+    def resolve(
+        game: Game,
+    ) -> type[BaseStorageBackend]:
+        """
+        Return the configured storage backend for a game.
+        """
+
+        backend = StorageRegistry.get(
+            game.manifest.storage_backend,
+        )
+
+        assert backend is not None
+
+        return backend

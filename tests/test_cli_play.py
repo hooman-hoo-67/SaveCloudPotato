@@ -25,6 +25,8 @@ from savecloud.services.library import SaveCloudLibrary
 from savecloud.services.registry import RegistryService
 from savecloud.services.sync import SyncService
 
+from savecloud.storage import StorageRegistry
+
 GAME_ID = "cli-play-test"
 
 
@@ -55,7 +57,7 @@ def cleanup(game: Game) -> None:
     if working.exists():
         shutil.rmtree(working)
 
-    backend = SyncService.backend(
+    backend = StorageRegistry.resolve(
         game,
     )
 

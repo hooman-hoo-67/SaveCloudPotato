@@ -12,30 +12,13 @@ from savecloud.services.device import DeviceService
 from savecloud.services.library import SaveCloudLibrary
 from savecloud.services.registry import RegistryService
 from savecloud.services.save import SaveService
-from savecloud.storage import get_backend
+from savecloud.storage import StorageRegistry
 
 
 class SyncService:
     """
     High-level synchronization workflows.
     """
-
-    @staticmethod
-    def backend(game: Game):
-        """
-        Return the configured storage backend.
-        """
-
-        backend = get_backend(
-            game.manifest.storage_backend,
-        )
-
-        if backend is None:
-            raise RuntimeError(
-                f'Unknown storage backend: "{game.manifest.storage_backend}".'
-            )
-
-        return backend
 
     @staticmethod
     def upload(
@@ -51,9 +34,7 @@ class SyncService:
             game.manifest.game_id,
         )
 
-        backend = SyncService.backend(
-            game,
-        )
+        backend = StorageRegistry.resolve(game)
 
         try:
             #
@@ -173,9 +154,7 @@ class SyncService:
             game.manifest.game_id,
         )
 
-        backend = SyncService.backend(
-            game,
-        )
+        backend = StorageRegistry.resolve(game)
 
         try:
             #
@@ -233,9 +212,7 @@ class SyncService:
         storage backend.
         """
 
-        backend = SyncService.backend(
-            game,
-        )
+        backend = StorageRegistry.resolve(game)
 
         if not backend.exists(
             game,
