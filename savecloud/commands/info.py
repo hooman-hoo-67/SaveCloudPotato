@@ -4,16 +4,12 @@ Display information about a registered game.
 
 import typer
 
+from savecloud.services.configuration import ConfigurationService
 from savecloud.services.device import DeviceService
 from savecloud.services.library import SaveCloudLibrary
 from savecloud.services.registry import RegistryService
 
-app = typer.Typer(
-    invoke_without_command=True,
-)
 
-
-@app.callback()
 def info(game_id: str) -> None:
     """
     Display information about a registered game.
@@ -49,9 +45,21 @@ def info(game_id: str) -> None:
 
     typer.echo(f"Adapter         : {game.manifest.adapter}")
 
+    typer.echo(f"Sync Enabled    : {game.manifest.sync_enabled}")
+
+    typer.echo(f"Backup Enabled  : {game.manifest.backup_enabled}")
+
     typer.echo()
 
-    typer.echo(f"Storage Backend : {game.manifest.storage_backend}")
+    #
+    # Storage is an installation-wide setting, not a per-game one.
+    #
+
+    config = ConfigurationService.load()
+
+    typer.echo(f"Storage Backend : {config.storage_backend} (installation-wide)")
+
+    typer.echo(f"Storage Root    : {config.storage_root}")
 
     typer.echo()
 

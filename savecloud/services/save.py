@@ -14,6 +14,7 @@ from pathlib import Path
 from savecloud.services.library import SaveCloudLibrary
 from savecloud.models.game import Game
 from savecloud.models.device_profile import DeviceProfile
+from savecloud.utils.hashing import hash_directory
 
 
 class SaveService:
@@ -101,10 +102,37 @@ class SaveService:
     @staticmethod
     def create_version(
         game: Game,
-    ) -> None:
+    ) -> int:
         """
         Create a new version from the
         current managed save.
+
+        Returns
+        -------
+        int
+            The version number that was created.
+        """
+
+        return SaveService.create_version_from(
+            game,
+            SaveService.current_save(game),
+        )
+
+    @staticmethod
+    def create_version_from(
+        game: Game,
+        source: Path,
+    ) -> int:
+        """
+        Create a new version from an arbitrary directory.
+
+        Used when preserving a save that is not the current one, such
+        as the losing side of a conflict.
+
+        Returns
+        -------
+        int
+            The version number that was created.
         """
 
         metadata = SaveCloudLibrary.load_library_metadata(
@@ -113,15 +141,11 @@ class SaveService:
 
         next_version = metadata.latest_version + 1
 
-        source = SaveService.current_save(
-            game,
-        )
-
         if not source.exists():
-            raise FileNotFoundError(f"Working save directory does not exist: {source}")
+            raise FileNotFoundError(f"Save directory does not exist: {source}")
 
         if not source.is_dir():
-            raise NotADirectoryError(f"Working save path is not a directory: {source}")
+            raise NotADirectoryError(f"Save path is not a directory: {source}")
 
         destination = SaveCloudLibrary.version_directory(
             game.manifest.game_id,
@@ -143,6 +167,8 @@ class SaveService:
             metadata,
         )
 
+        return next_version
+
     @staticmethod
     def restore_version(
         game: Game,
@@ -150,6 +176,9 @@ class SaveService:
     ) -> None:
         """
         Restore a previous version.
+
+        The save being replaced is preserved as a new version first, so
+        a restore is itself reversible and no history is ever lost.
         """
 
         if not SaveService.version_exists(
@@ -166,6 +195,13 @@ class SaveService:
         destination = SaveService.current_save(
             game,
         )
+
+        #
+        # Preserve what is about to be overwritten.
+        #
+
+        if destination.exists():
+            SaveService.create_version(game)
 
         if destination.exists():
             shutil.rmtree(destination)
@@ -286,6 +322,30 @@ class SaveService:
         return True
 
     @staticmethod
+    def checksum(
+        game: Game,
+    ) -> str:
+        """
+        Return the checksum of the managed save.
+        """
+
+        return hash_directory(
+            SaveService.current_save(game),
+        )
+
+    @staticmethod
+    def working_checksum(
+        profile: DeviceProfile,
+    ) -> str:
+        """
+        Return the checksum of the working save.
+        """
+
+        return hash_directory(
+            profile.working_save_path,
+        )
+
+    @staticmethod
     def has_changes(
         game: Game,
         profile: DeviceProfile,
@@ -307,16 +367,15 @@ class SaveService:
         working = profile.working_save_path
 
         #
-        # Missing directories are considered changes.
+        # A missing working save cannot be compared. Treat it as
+        # unchanged so that synchronization never overwrites the
+        # library with nothing.
         #
+
+        if not working.exists():
+            return False
 
         if not managed.exists():
             return True
 
-        if not working.exists():
-            return True
-
-        return not SaveService.directories_equal(
-            managed,
-            working,
-        )
+        return SaveService.checksum(game) != SaveService.working_checksum(profile)

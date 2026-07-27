@@ -11,10 +11,7 @@ from savecloud.services.registry import RegistryService
 from savecloud.services.save import SaveService
 from savecloud.services.library import SaveCloudLibrary
 
-app = typer.Typer()
 
-
-@app.callback(invoke_without_command=True)
 def import_save(
     game_id: str,
 ) -> None:

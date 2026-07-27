@@ -1,436 +1,415 @@
 """
-Test SyncService upload workflow.
+Tests for the SyncService.
 
-Run with:
-
-python tests/test_sync.py
+These cover the decision that matters most in SaveCloud: whether a
+difference between two devices is a one-sided change that can be
+applied automatically, or a genuine conflict that must not be resolved
+by guessing.
 """
 
 from __future__ import annotations
 
-import shutil
-from pathlib import Path
+import json
 
-from savecloud.models.device_profile import DeviceProfile
-from savecloud.models.game import (
-    Game,
-    GameManifest,
-    GameRuntime,
-    LaunchType,
-    Platform,
-    SyncStatus,
-)
-from savecloud.services.device import DeviceService
-from savecloud.services.library import SaveCloudLibrary
+import pytest
+
+from savecloud.models.game import SyncStatus
+from savecloud.models.remote_state import RemoteState
+from savecloud.services.configuration import ConfigurationService
 from savecloud.services.registry import RegistryService
 from savecloud.services.save import SaveService
-from savecloud.services.sync import SyncService
-from savecloud.storage.local import LocalStorageBackend
+from savecloud.services.sync import (
+    ConflictResolution,
+    StorageUnavailableError,
+    SyncAction,
+    SyncConflictError,
+    SyncService,
+)
+from savecloud.storage import LocalStorageBackend
+from savecloud.utils.hashing import hash_directory
 
-GAME_ID = "sync-test"
+from tests.conftest import GAME_ID, read_save, register_game, write_save
 
 
-def section(title: str) -> None:
-    print()
-    print("=" * 70)
-    print(title)
-    print("=" * 70)
-
-
-def cleanup(game: Game) -> None:
+def advance_remote(
+    game_id: str,
+    contents: str,
+    device_id: str = "other-device",
+) -> str:
     """
-    Remove any existing test data.
+    Simulate another device uploading a different save.
+
+    Returns the new remote checksum.
     """
 
-    RegistryService.delete_registry(
-        game.manifest.game_id,
+    remote = LocalStorageBackend.current_directory(game_id)
+
+    write_save(remote, contents)
+
+    checksum = hash_directory(remote)
+
+    state = RemoteState.create(
+        game_id=game_id,
+        checksum=checksum,
+        version=1,
+        device_id=device_id,
+        device_name="Other Device",
     )
 
-    SaveCloudLibrary.delete_game_library(
-        game.manifest.game_id,
-    )
-
-    DeviceService.delete_profile(
-        SaveCloudLibrary.device_id(),
-        game.manifest.game_id,
-    )
-
-    remote = LocalStorageBackend.game_directory(
-        game.manifest.game_id,
-    )
-
-    if remote.exists():
-        shutil.rmtree(remote)
-
-    working = Path.home() / "SaveCloudSyncTest"
-
-    if working.exists():
-        shutil.rmtree(working)
-
-
-def main() -> None:
-
-    section("TEST 1 - CREATE GAME")
-
-    manifest = GameManifest(
-        game_id=GAME_ID,
-        display_name="Sync Test",
-        launch_type=LaunchType.MANUAL,
-        platform=Platform.NATIVE,
-        adapter="eden",
-        storage_backend="local",
-    )
-
-    runtime = GameRuntime()
-
-    game = Game(
-        manifest=manifest,
-        runtime=runtime,
-    )
-
-    cleanup(game)
-
-    print("✓ Game created")
-
-    #
-    # Working save
-    #
-
-    section("TEST 2 - CREATE WORKING SAVE")
-
-    working_save = Path.home() / "SaveCloudSyncTest"
-
-    working_save.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    (working_save / "save.dat").write_text(
-        "SaveCloud Test Save",
+    LocalStorageBackend.state_path(game_id).write_text(
+        json.dumps(state.to_dict()),
         encoding="utf-8",
     )
 
-    print("✓ Working save created")
+    return checksum
+
+
+#
+# First synchronization
+#
+
+
+def test_first_sync_uploads(registered_game):
+
+    assert SyncService.sync(registered_game) is SyncAction.UPLOAD
+
+    assert LocalStorageBackend.exists(GAME_ID)
+    assert read_save(LocalStorageBackend.current_directory(GAME_ID)) == "original"
+
+
+def test_upload_records_the_sync_checksum(registered_game):
+
+    SyncService.sync(registered_game)
+
+    runtime = RegistryService.load_runtime(GAME_ID)
+
+    assert runtime.status is SyncStatus.SYNCED
+    assert runtime.last_sync_checksum == SaveService.checksum(registered_game)
+    assert runtime.pending_upload is False
+
+
+def test_upload_creates_a_version(registered_game):
+
+    SyncService.sync(registered_game)
+
+    assert SaveService.list_versions(registered_game) == [1]
+
+
+#
+# Steady state
+#
+
+
+def test_unchanged_sync_is_a_no_op(registered_game):
+
+    SyncService.sync(registered_game)
+
+    game = RegistryService.load_game(GAME_ID)
+
+    assert SyncService.sync(game) is SyncAction.UP_TO_DATE
 
     #
-    # Registry
+    # No new version: nothing changed.
     #
 
-    section("TEST 3 - CREATE REGISTRY")
+    assert SaveService.list_versions(game) == [1]
 
-    RegistryService.create_registry(
-        game,
-    )
 
-    print("✓ Registry created")
+def test_status_does_not_change_anything(registered_game, working_save):
 
-    #
-    # Library
-    #
+    SyncService.sync(registered_game)
 
-    section("TEST 4 - CREATE LIBRARY")
+    write_save(working_save, "modified")
 
-    SaveCloudLibrary.create_game_library(
-        game,
-    )
+    game = RegistryService.load_game(GAME_ID)
 
-    print("✓ Library created")
+    assert SyncService.status(game) is SyncAction.UPLOAD
 
     #
-    # Device profile
+    # A status check must not upload.
     #
 
-    section("TEST 5 - CREATE DEVICE PROFILE")
+    assert read_save(LocalStorageBackend.current_directory(GAME_ID)) == "original"
 
-    profile = DeviceProfile(
-        device_id=SaveCloudLibrary.device_id(),
-        device_name=SaveCloudLibrary.device_name(),
-        game_id=GAME_ID,
-        working_save_path=working_save,
-        launch_command="dummy",
-    )
 
-    DeviceService.create_profile(
-        profile,
-    )
+#
+# One-sided changes
+#
 
-    print("✓ Device profile created")
 
-    #
-    # Upload
-    #
+def test_local_change_uploads(registered_game, working_save):
 
-    section("TEST 6 - UPLOAD")
+    SyncService.sync(registered_game)
 
-    SyncService.upload(
-        game,
-    )
+    write_save(working_save, "played some more")
 
-    print("✓ Upload completed")
+    game = RegistryService.load_game(GAME_ID)
 
-    #
-    # Verify remote storage
-    #
+    assert SyncService.sync(game) is SyncAction.UPLOAD
 
-    section("TEST 7 - VERIFY REMOTE STORAGE")
+    assert read_save(LocalStorageBackend.current_directory(GAME_ID)) == "played some more"
 
-    assert LocalStorageBackend.exists(
-        game,
-    )
 
-    print("✓ Remote save exists")
+def test_remote_change_downloads(registered_game, working_save):
 
-    #
-    # Verify runtime
-    #
+    SyncService.sync(registered_game)
 
-    section("TEST 8 - VERIFY RUNTIME")
+    advance_remote(GAME_ID, "progress from the other device")
 
-    loaded = RegistryService.load_game(
-        GAME_ID,
-    )
+    game = RegistryService.load_game(GAME_ID)
 
-    assert loaded.runtime.status == SyncStatus.SYNCED
+    assert SyncService.sync(game) is SyncAction.DOWNLOAD
 
-    assert loaded.runtime.pending_upload is False
+    assert read_save(working_save) == "progress from the other device"
 
-    assert loaded.runtime.last_device == SaveCloudLibrary.device_id()
 
-    assert loaded.runtime.last_sync is not None
+def test_download_updates_the_sync_checksum(registered_game):
 
-    print("✓ Runtime updated")
+    SyncService.sync(registered_game)
 
-    #
-    # Verify snapshot
-    #
+    checksum = advance_remote(GAME_ID, "remote progress")
 
-    section("TEST 9 - VERIFY SNAPSHOT")
+    game = RegistryService.load_game(GAME_ID)
 
-    versions = SaveService.list_versions(
-        loaded,
-    )
+    SyncService.sync(game)
 
-    assert versions == [1]
+    assert RegistryService.load_runtime(GAME_ID).last_sync_checksum == checksum
 
-    print("✓ Snapshot created")
 
-    #
-    # Verify metadata
-    #
+#
+# Conflicts
+#
 
-    section("TEST 10 - VERIFY METADATA")
 
-    metadata = SaveCloudLibrary.load_library_metadata(
-        GAME_ID,
-    )
+def test_both_sides_changed_is_a_conflict(registered_game, working_save):
 
-    assert metadata.last_import is not None
+    SyncService.sync(registered_game)
 
-    print("✓ Metadata updated")
-    section("TEST 11 - MODIFY WORKING SAVE")
+    write_save(working_save, "local progress")
 
-    (working_save / "save.dat").write_text(
-        "Modified Save",
-        encoding="utf-8",
-    )
+    advance_remote(GAME_ID, "remote progress")
 
-    assert (working_save / "save.dat").read_text(
-        encoding="utf-8",
-    ) == "Modified Save"
+    game = RegistryService.load_game(GAME_ID)
 
-    print("✓ Working save modified")
+    assert SyncService.status(game) is SyncAction.CONFLICT
 
-    section("TEST 12 - DOWNLOAD")
+    with pytest.raises(SyncConflictError):
+        SyncService.sync(game)
 
-    loaded = RegistryService.load_game(
-        GAME_ID,
-    )
 
-    SyncService.download(
-        loaded,
-    )
+def test_a_conflict_changes_nothing(registered_game, working_save):
+    """
+    The whole point of aborting: neither save is touched.
+    """
 
-    print("✓ Download completed")
+    SyncService.sync(registered_game)
 
-    section("TEST 13 - VERIFY WORKING SAVE")
+    write_save(working_save, "local progress")
 
-    contents = (working_save / "save.dat").read_text(
-        encoding="utf-8",
-    )
+    advance_remote(GAME_ID, "remote progress")
 
-    assert contents == "SaveCloud Test Save"
+    game = RegistryService.load_game(GAME_ID)
 
-    print("✓ Working save restored")
+    with pytest.raises(SyncConflictError):
+        SyncService.sync(game)
 
-    section("TEST 14 - VERIFY RUNTIME")
+    assert read_save(working_save) == "local progress"
+    assert read_save(LocalStorageBackend.current_directory(GAME_ID)) == "remote progress"
 
-    loaded = RegistryService.load_game(
-        GAME_ID,
-    )
 
-    assert loaded.runtime.status == SyncStatus.SYNCED
+def test_a_conflict_is_recorded_in_the_runtime(registered_game, working_save):
 
-    assert loaded.runtime.pending_upload is False
+    SyncService.sync(registered_game)
 
-    assert loaded.runtime.last_device == SaveCloudLibrary.device_id()
+    write_save(working_save, "local progress")
 
-    assert loaded.runtime.last_sync is not None
+    advance_remote(GAME_ID, "remote progress")
 
-    print("✓ Runtime updated")
+    with pytest.raises(SyncConflictError):
+        SyncService.sync(RegistryService.load_game(GAME_ID))
 
-    section("TEST 15 - VERIFY EXPORT METADATA")
+    assert RegistryService.load_runtime(GAME_ID).status is SyncStatus.CONFLICT
 
-    metadata = SaveCloudLibrary.load_library_metadata(
-        GAME_ID,
-    )
 
-    assert metadata.last_export is not None
+def test_an_unknown_ancestor_is_treated_as_a_conflict(registered_game, working_save):
+    """
+    Without a common ancestor there is no basis for choosing a side.
+    """
 
-    print("✓ Export metadata updated")
+    write_save(LocalStorageBackend.current_directory(GAME_ID), "pre-existing remote")
 
-    section("TEST 16 - SYNC DOWNLOAD PATH")
+    advance_remote(GAME_ID, "pre-existing remote")
+
+    game = RegistryService.load_game(GAME_ID)
+
+    assert game.runtime.last_sync_checksum is None
+
+    assert SyncService.status(game) is SyncAction.CONFLICT
+
+
+def test_keep_local_wins_and_preserves_the_remote(registered_game, working_save):
+
+    SyncService.sync(registered_game)
+
+    write_save(working_save, "local progress")
+
+    advance_remote(GAME_ID, "remote progress")
+
+    game = RegistryService.load_game(GAME_ID)
+
+    action = SyncService.sync(game, ConflictResolution.LOCAL)
+
+    assert action is SyncAction.UPLOAD
+
+    assert read_save(LocalStorageBackend.current_directory(GAME_ID)) == "local progress"
 
     #
-    # Working save currently contains the remote contents.
-    # Change it so we can verify sync() restores it.
+    # The overwritten remote save must still be recoverable.
     #
 
-    (working_save / "save.dat").write_text(
-        "Modified Again",
-        encoding="utf-8",
-    )
+    versions = SaveService.list_versions(game)
 
-    loaded = RegistryService.load_game(
-        GAME_ID,
-    )
+    archived = [
+        read_save(SaveService.current_save(game).parent / "versions" / f"{v:06d}")
+        for v in versions
+    ]
+
+    assert "remote progress" in archived
+
+
+def test_keep_remote_wins_and_preserves_the_local_save(
+    registered_game,
+    working_save,
+):
+
+    SyncService.sync(registered_game)
+
+    write_save(working_save, "local progress")
+
+    advance_remote(GAME_ID, "remote progress")
+
+    game = RegistryService.load_game(GAME_ID)
+
+    action = SyncService.sync(game, ConflictResolution.REMOTE)
+
+    assert action is SyncAction.DOWNLOAD
+
+    assert read_save(working_save) == "remote progress"
+
+    versions = SaveService.list_versions(game)
+
+    archived = [
+        read_save(SaveService.current_save(game).parent / "versions" / f"{v:06d}")
+        for v in versions
+    ]
+
+    #
+    # The library held "original" when the conflict was resolved; the
+    # displaced save is preserved rather than discarded.
+    #
+
+    assert len(versions) >= 2
+    assert "original" in archived
+
+
+def test_resolution_clears_the_conflict_state(registered_game, working_save):
+
+    SyncService.sync(registered_game)
+
+    write_save(working_save, "local progress")
+
+    advance_remote(GAME_ID, "remote progress")
 
     SyncService.sync(
-        loaded,
+        RegistryService.load_game(GAME_ID),
+        ConflictResolution.LOCAL,
     )
 
-    contents = (working_save / "save.dat").read_text(
-        encoding="utf-8",
-    )
+    assert RegistryService.load_runtime(GAME_ID).status is SyncStatus.SYNCED
 
-    assert contents == "SaveCloud Test Save"
 
-    print("✓ sync() selected download()")
+#
+# Backend availability
+#
 
-    section("TEST 17 - SYNC UPLOAD PATH")
+
+def test_sync_fails_clearly_when_storage_is_unavailable(registered_game):
+
+    ConfigurationService.set_backend("syncthing")
 
     #
-    # Modify the working save.
+    # No Syncthing folder marker exists, so the backend is unusable.
     #
 
-    (working_save / "save.dat").write_text(
-        "Newest Save",
-        encoding="utf-8",
-    )
-
-    loaded = RegistryService.load_game(
-        GAME_ID,
-    )
-
-    loaded.runtime.mark_pending()
-
-    RegistryService.update_runtime(
-        loaded,
-    )
-
-    SyncService.sync(
-        loaded,
-    )
-
-    #
-    # Download immediately afterwards to verify the
-    # remote was updated.
-    #
-
-    SyncService.download(
-        loaded,
-    )
-
-    contents = (working_save / "save.dat").read_text(
-        encoding="utf-8",
-    )
-
-    assert contents == "Newest Save"
-
-    loaded = RegistryService.load_game(
-        GAME_ID,
-    )
-
-    assert loaded.runtime.status == SyncStatus.SYNCED
-    assert loaded.runtime.pending_upload is False
-
-    print("✓ sync() selected upload()")
-
-    section("TEST 18 - MISSING REMOTE")
-
-    LocalStorageBackend.delete(
-        loaded,
-    )
-
-    assert not LocalStorageBackend.exists(
-        loaded,
-    )
-
-    SyncService.sync(
-        loaded,
-    )
-
-    assert LocalStorageBackend.exists(
-        loaded,
-    )
-
-    print("✓ sync() uploaded missing remote")
-
-    section("TEST 19 - NO CHANGE UPLOAD")
-
-    #
-    # Record current version.
-    #
-
-    metadata_before = SaveCloudLibrary.load_library_metadata(
-        GAME_ID,
-    )
-
-    latest_before = metadata_before.latest_version
-
-    #
-    # Upload again without modifying anything.
-    #
-
-    loaded = RegistryService.load_game(
-        GAME_ID,
-    )
-
-    SyncService.upload(
-        loaded,
-    )
-
-    #
-    # Verify no new snapshot was created.
-    #
-
-    metadata_after = SaveCloudLibrary.load_library_metadata(
-        GAME_ID,
-    )
-
-    assert metadata_after.latest_version == latest_before
-
-    print("✓ Upload skipped because no changes were detected")
-
-    section("TEST 20 - CLEANUP")
-
-    cleanup(
-        loaded,
-    )
-
-    print("✓ Cleanup complete")
-
-    section("ALL TESTS PASSED")
+    with pytest.raises(StorageUnavailableError):
+        SyncService.sync(registered_game)
 
 
-if __name__ == "__main__":
-    main()
+def test_an_unavailable_backend_does_not_corrupt_the_library(registered_game):
+
+    ConfigurationService.set_backend("syncthing")
+
+    with pytest.raises(StorageUnavailableError):
+        SyncService.upload(registered_game)
+
+    assert SaveService.current_save(registered_game).exists()
+
+
+#
+# Bulk synchronization
+#
+
+
+def test_sync_all_covers_every_game(tmp_path):
+
+    first = tmp_path / "working-one"
+    second = tmp_path / "working-two"
+
+    write_save(first, "one")
+    write_save(second, "two")
+
+    register_game(first, game_id="game-one")
+    register_game(second, game_id="game-two")
+
+    results = SyncService.sync_all()
+
+    assert results == {
+        "game-one": SyncAction.UPLOAD,
+        "game-two": SyncAction.UPLOAD,
+    }
+
+
+def test_sync_all_skips_games_with_sync_disabled(tmp_path):
+
+    working = tmp_path / "working-disabled"
+
+    write_save(working, "data")
+
+    register_game(working, game_id="disabled", sync_enabled=False)
+
+    assert SyncService.sync_all() == {}
+
+
+def test_sync_all_continues_past_a_failure(tmp_path, registered_game, monkeypatch):
+
+    working = tmp_path / "working-broken"
+
+    write_save(working, "data")
+
+    register_game(working, game_id="broken")
+
+    original = SyncService.upload
+
+    def failing_upload(game):
+
+        if game.manifest.game_id == "broken":
+            raise RuntimeError("backend exploded")
+
+        return original(game)
+
+    monkeypatch.setattr(SyncService, "upload", staticmethod(failing_upload))
+
+    results = SyncService.sync_all()
+
+    assert results[GAME_ID] is SyncAction.UPLOAD
+    assert "backend exploded" in results["broken"]

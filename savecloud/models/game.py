@@ -57,6 +57,10 @@ class GameManifest:
 
     This information changes rarely and is synchronized
     between every device.
+
+    Storage backend selection deliberately lives outside the manifest.
+    It is a property of the installation, not of a game, and is held by
+    InstallationConfig.
     """
 
     game_id: str
@@ -66,7 +70,6 @@ class GameManifest:
     platform: Platform
 
     adapter: str
-    storage_backend: str
 
     backup_enabled: bool = True
     sync_enabled: bool = True
@@ -103,6 +106,15 @@ class GameRuntime:
     pending_upload: bool = False
 
     last_error: Optional[str] = None
+
+    #
+    # Checksum of the save contents at the last successful
+    # synchronization. Comparing it against the local and remote
+    # checksums is what distinguishes a one-sided change from a
+    # genuine conflict.
+    #
+
+    last_sync_checksum: Optional[str] = None
 
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
@@ -144,9 +156,18 @@ class GameRuntime:
     def mark_synced(
         self,
         device_id: str,
+        checksum: Optional[str] = None,
     ) -> None:
         """
         Mark the game as synchronized.
+
+        Parameters
+        ----------
+        device_id
+            Device that performed the synchronization.
+        checksum
+            Checksum of the synchronized save contents. Recording it
+            establishes the common ancestor for the next comparison.
         """
 
         self.status = SyncStatus.SYNCED
@@ -154,6 +175,9 @@ class GameRuntime:
         self.last_error = None
         self.last_device = device_id
         self.last_sync = datetime.now(UTC)
+
+        if checksum is not None:
+            self.last_sync_checksum = checksum
 
     def mark_error(
         self,

@@ -16,7 +16,8 @@ from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 
-from savecloud.config.constants import REGISTRY_DIR
+from savecloud.config import layout
+from savecloud.config.constants import registry_dir
 from savecloud.models.game import (
     Game,
     GameManifest,
@@ -33,17 +34,17 @@ class RegistryService:
     @staticmethod
     def registry_directory(game_id: str) -> Path:
         """Return the registry directory for a game."""
-        return REGISTRY_DIR / game_id
+        return layout.game_registry_directory(game_id)
 
     @staticmethod
     def registry_manifest_path(game_id: str) -> Path:
         """Return the manifest.json path."""
-        return RegistryService.registry_directory(game_id) / "manifest.json"
+        return layout.manifest_path(game_id)
 
     @staticmethod
     def registry_runtime_path(game_id: str) -> Path:
         """Return the runtime.json path."""
-        return RegistryService.registry_directory(game_id) / "runtime.json"
+        return layout.runtime_path(game_id)
 
     @staticmethod
     def exists(game_id: str) -> bool:
@@ -137,6 +138,11 @@ class RegistryService:
     ) -> GameManifest:
         """
         Load a GameManifest from the registry.
+
+        Manifests written before storage configuration moved into
+        InstallationConfig still carry a ``storage_backend`` field. It
+        is ignored rather than rejected, so older installations keep
+        loading.
         """
 
         with RegistryService.registry_manifest_path(
@@ -153,9 +159,8 @@ class RegistryService:
             launch_type=LaunchType(manifest_data["launch_type"]),
             platform=Platform(manifest_data["platform"]),
             adapter=manifest_data["adapter"],
-            storage_backend=manifest_data["storage_backend"],
-            backup_enabled=manifest_data["backup_enabled"],
-            sync_enabled=manifest_data["sync_enabled"],
+            backup_enabled=manifest_data.get("backup_enabled", True),
+            sync_enabled=manifest_data.get("sync_enabled", True),
         )
 
     @staticmethod
@@ -187,16 +192,39 @@ class RegistryService:
 
         games: list[Game] = []
 
-        if not REGISTRY_DIR.exists():
+        registry = registry_dir()
+
+        if not registry.exists():
             return games
 
-        for directory in sorted(REGISTRY_DIR.iterdir()):
+        for directory in sorted(registry.iterdir()):
             if not directory.is_dir():
+                continue
+
+            if not RegistryService.registry_manifest_path(directory.name).exists():
                 continue
 
             games.append(RegistryService.load_game(directory.name))
 
         return games
+
+    @staticmethod
+    def list_game_ids() -> list[str]:
+        """
+        Return every registered game ID.
+        """
+
+        registry = registry_dir()
+
+        if not registry.exists():
+            return []
+
+        return sorted(
+            directory.name
+            for directory in registry.iterdir()
+            if directory.is_dir()
+            and RegistryService.registry_manifest_path(directory.name).exists()
+        )
 
     @staticmethod
     def load_runtime(
@@ -216,7 +244,7 @@ class RegistryService:
 
         last_sync = None
 
-        if runtime_data["last_sync"] is not None:
+        if runtime_data.get("last_sync") is not None:
             last_sync = datetime.fromisoformat(
                 runtime_data["last_sync"],
             )
@@ -245,6 +273,7 @@ class RegistryService:
             status=SyncStatus(runtime_data["status"]),
             pending_upload=runtime_data["pending_upload"],
             last_error=runtime_data["last_error"],
+            last_sync_checksum=runtime_data.get("last_sync_checksum"),
             created_at=datetime.fromisoformat(
                 runtime_data["created_at"],
             ),
@@ -262,3 +291,40 @@ class RegistryService:
             game.manifest.game_id,
             game.runtime,
         )
+
+    @staticmethod
+    def legacy_storage_backend() -> str | None:
+        """
+        Return a storage backend recorded by an older installation.
+
+        Before storage selection moved into InstallationConfig, every
+        manifest stored its own backend. This reports the one they
+        agree on so it can be adopted as the installation default.
+
+        Returns None when no legacy value exists, or when manifests
+        disagree and no single value can be inferred.
+        """
+
+        backends: set[str] = set()
+
+        for game_id in RegistryService.list_game_ids():
+
+            try:
+                with RegistryService.registry_manifest_path(game_id).open(
+                    "r",
+                    encoding="utf-8",
+                ) as file:
+                    data = json.load(file)
+
+            except (json.JSONDecodeError, OSError):
+                continue
+
+            backend = data.get("storage_backend")
+
+            if backend:
+                backends.add(backend.lower())
+
+        if len(backends) == 1:
+            return backends.pop()
+
+        return None

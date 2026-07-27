@@ -10,10 +10,7 @@ from savecloud.services.library import SaveCloudLibrary
 from savecloud.services.registry import RegistryService
 from savecloud.services.save import SaveService
 
-app = typer.Typer()
 
-
-@app.callback(invoke_without_command=True)
 def snapshot(
     game_id: str,
 ) -> None:

@@ -17,13 +17,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
+from savecloud.config import layout
 from savecloud.config.constants import (
-    DIRECTORIES,
-    INSTALL_METADATA,
-    LIBRARY_DIR,
-    SAVECLOUD_HOME,
     SAVECLOUD_VERSION,
     SCHEMA_VERSION,
+    directories,
+    install_metadata_path,
+    savecloud_home,
 )
 
 
@@ -39,11 +39,22 @@ class SaveCloudLibrary:
     @staticmethod
     def exists() -> bool:
         """Return True if the SaveCloud root directory exists."""
-        return SAVECLOUD_HOME.exists()
+        return savecloud_home().exists()
 
     @staticmethod
     def create_install_metadata() -> None:
-        """Create installation metadata."""
+        """
+        Create installation metadata.
+
+        Existing metadata is preserved. The device ID identifies this
+        machine across every synchronized device, so regenerating it
+        would orphan the device's history.
+        """
+
+        path = install_metadata_path()
+
+        if path.exists():
+            return
 
         metadata = {
             "schema_version": SCHEMA_VERSION,
@@ -53,14 +64,14 @@ class SaveCloudLibrary:
             "created_at": datetime.now(UTC).isoformat(),
         }
 
-        with INSTALL_METADATA.open("w", encoding="utf-8") as file:
+        with path.open("w", encoding="utf-8") as file:
             json.dump(metadata, file, indent=4)
 
     @staticmethod
     def installation_metadata() -> dict:
         """Return installation metadata."""
 
-        with INSTALL_METADATA.open("r", encoding="utf-8") as file:
+        with install_metadata_path().open("r", encoding="utf-8") as file:
             return json.load(file)
 
     @staticmethod
@@ -81,9 +92,9 @@ class SaveCloudLibrary:
 
         created: list[Path] = []
 
-        SAVECLOUD_HOME.mkdir(parents=True, exist_ok=True)
+        savecloud_home().mkdir(parents=True, exist_ok=True)
 
-        for directory in DIRECTORIES:
+        for directory in directories():
             if not directory.exists():
                 directory.mkdir(parents=True)
                 created.append(directory)
@@ -98,13 +109,13 @@ class SaveCloudLibrary:
         Validate the SaveCloud installation.
         """
 
-        if not SAVECLOUD_HOME.exists():
+        if not savecloud_home().exists():
             return False
 
-        if not INSTALL_METADATA.exists():
+        if not install_metadata_path().exists():
             return False
 
-        if not all(directory.exists() for directory in DIRECTORIES):
+        if not all(directory.exists() for directory in directories()):
             return False
 
         try:
@@ -133,17 +144,17 @@ class SaveCloudLibrary:
     @staticmethod
     def library_directory(game_id: str) -> Path:
         """Return the library directory for a game."""
-        return LIBRARY_DIR / game_id
+        return layout.game_library_directory(game_id)
 
     @staticmethod
     def current_directory(game_id: str) -> Path:
         """Return the current save directory."""
-        return SaveCloudLibrary.library_directory(game_id) / "current"
+        return layout.current_directory(game_id)
 
     @staticmethod
     def versions_directory(game_id: str) -> Path:
         """Return the versions directory."""
-        return SaveCloudLibrary.library_directory(game_id) / "versions"
+        return layout.versions_directory(game_id)
 
     @staticmethod
     def version_directory(
@@ -154,12 +165,12 @@ class SaveCloudLibrary:
         Return the directory for a specific save version.
         """
 
-        return SaveCloudLibrary.versions_directory(game_id) / f"{version:06d}"
+        return layout.version_directory(game_id, version)
 
     @staticmethod
     def metadata_path(game_id: str) -> Path:
         """Return the metadata.json path."""
-        return SaveCloudLibrary.library_directory(game_id) / "metadata.json"
+        return layout.library_metadata_path(game_id)
 
     @staticmethod
     def load_library_metadata(
@@ -229,6 +240,43 @@ class SaveCloudLibrary:
                 file,
                 indent=4,
             )
+
+    @staticmethod
+    def ensure_game_library(
+        game_id: str,
+        current_version: int = 0,
+    ) -> None:
+        """
+        Create a game's library structure if it is missing.
+
+        Used when adopting a game that already exists remotely, where
+        the library must exist before a download can populate it.
+        Existing metadata is never overwritten.
+        """
+
+        SaveCloudLibrary.current_directory(game_id).mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        SaveCloudLibrary.versions_directory(game_id).mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        if SaveCloudLibrary.metadata_path(game_id).exists():
+            return
+
+        SaveCloudLibrary.save_library_metadata(
+            game_id,
+            LibraryMetadata(
+                current_version=current_version,
+                latest_version=current_version,
+                created_at=datetime.now(UTC).isoformat(),
+                last_import=None,
+                last_export=None,
+            ),
+        )
 
     @staticmethod
     def delete_game_library(game_id: str) -> None:
