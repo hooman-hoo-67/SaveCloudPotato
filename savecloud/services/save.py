@@ -139,13 +139,25 @@ class SaveService:
             game.manifest.game_id,
         )
 
-        next_version = metadata.latest_version + 1
-
         if not source.exists():
             raise FileNotFoundError(f"Save directory does not exist: {source}")
 
         if not source.is_dir():
             raise NotADirectoryError(f"Save path is not a directory: {source}")
+
+        #
+        # Allocate above whatever is actually on disk, not merely above
+        # what the metadata has seen. A device that adopted a game
+        # received version directories the metadata never allocated,
+        # and versions are immutable.
+        #
+
+        existing = SaveService.list_versions(game)
+
+        next_version = max(
+            metadata.latest_version,
+            max(existing) if existing else 0,
+        ) + 1
 
         destination = SaveCloudLibrary.version_directory(
             game.manifest.game_id,
@@ -153,7 +165,9 @@ class SaveService:
         )
 
         if destination.exists():
-            shutil.rmtree(destination)
+            raise FileExistsError(
+                f"Version {next_version} already exists: {destination}",
+            )
 
         shutil.copytree(
             source,

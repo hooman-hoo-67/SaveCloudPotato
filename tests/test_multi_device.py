@@ -383,3 +383,59 @@ def test_version_history_is_shared_between_devices(desktop, deck):
     #
 
     assert len(SaveService.list_versions(deck.game())) >= 2
+
+
+def test_an_adopted_device_does_not_overwrite_inherited_history(desktop, deck):
+    """
+    Versions arrive on a paired device without its metadata having
+    allocated those numbers.
+    """
+
+    desktop.activate()
+    desktop.sync()
+
+    for chapter in ("chapter two", "chapter three"):
+        desktop.play(chapter)
+        desktop.sync()
+
+    pair_game(deck)
+
+    deck.activate()
+
+    inherited = {
+        version: read_save(SaveCloudLibrary.version_directory(GAME_ID, version))
+        for version in SaveService.list_versions(deck.game())
+    }
+
+    assert len(inherited) >= 3
+
+    #
+    # Play and sync on the Deck several times over.
+    #
+
+    for session in range(3):
+        deck.play(f"deck session {session}")
+        deck.sync()
+
+    for version, contents in inherited.items():
+        assert (
+            read_save(SaveCloudLibrary.version_directory(GAME_ID, version))
+            == contents
+        ), f"version {version} was overwritten"
+
+
+def test_library_metadata_learns_about_downloaded_versions(desktop, deck):
+
+    desktop.activate()
+    desktop.sync()
+
+    desktop.play("chapter two")
+    desktop.sync()
+
+    pair_game(deck)
+
+    deck.activate()
+
+    metadata = SaveCloudLibrary.load_library_metadata(GAME_ID)
+
+    assert metadata.latest_version == max(SaveService.list_versions(deck.game()))

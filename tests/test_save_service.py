@@ -132,6 +132,46 @@ def test_restore_preserves_the_save_it_replaces(
     assert read_save(SaveCloudLibrary.version_directory(GAME_ID, 2)) == "second"
 
 
+def test_versions_pulled_from_storage_are_never_overwritten(
+    registered_game,
+    profile,
+    working_save,
+):
+    """
+    A device that adopts a game receives version directories without
+    its metadata having allocated those numbers. Allocating the next
+    version from metadata alone would overwrite immutable history.
+    """
+
+    SaveService.import_save(registered_game, profile)
+
+    for _ in range(3):
+        SaveService.create_version(registered_game)
+
+    original = read_save(SaveCloudLibrary.version_directory(GAME_ID, 1))
+
+    #
+    # Simulate the post-download state: versions on disk, metadata that
+    # never learned about them.
+    #
+
+    metadata = SaveCloudLibrary.load_library_metadata(GAME_ID)
+
+    metadata.latest_version = 0
+
+    SaveCloudLibrary.save_library_metadata(GAME_ID, metadata)
+
+    write_save(working_save, "new session")
+
+    SaveService.import_save(registered_game, profile)
+
+    created = SaveService.create_version(registered_game)
+
+    assert created == 4
+
+    assert read_save(SaveCloudLibrary.version_directory(GAME_ID, 1)) == original
+
+
 def test_restore_rejects_an_unknown_version(registered_game):
 
     with pytest.raises(FileNotFoundError):

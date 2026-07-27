@@ -352,6 +352,50 @@ class SaveCloudLibrary:
         )
 
     @staticmethod
+    def reconcile_versions(
+        game_id: str,
+    ) -> int:
+        """
+        Raise the recorded latest version to match what is on disk.
+
+        A download brings version directories this device's metadata
+        never allocated. Reconciling keeps the metadata truthful.
+
+        Returns
+        -------
+        int
+            The latest version after reconciliation.
+        """
+
+        versions_directory = SaveCloudLibrary.versions_directory(game_id)
+
+        highest = 0
+
+        if versions_directory.exists():
+
+            for directory in versions_directory.iterdir():
+
+                if not directory.is_dir():
+                    continue
+
+                try:
+                    highest = max(highest, int(directory.name))
+
+                except ValueError:
+                    continue
+
+        metadata = SaveCloudLibrary.load_library_metadata(game_id)
+
+        if highest <= metadata.latest_version:
+            return metadata.latest_version
+
+        metadata.latest_version = highest
+
+        SaveCloudLibrary.save_library_metadata(game_id, metadata)
+
+        return highest
+
+    @staticmethod
     def increment_latest_version(
         game_id: str,
     ) -> int:

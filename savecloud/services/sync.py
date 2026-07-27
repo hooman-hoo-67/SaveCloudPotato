@@ -332,6 +332,13 @@ class SyncService:
             state = backend.download(game_id)
 
             #
+            # The download brings version directories this device's
+            # metadata has never seen.
+            #
+
+            SaveCloudLibrary.reconcile_versions(game_id)
+
+            #
             # Reloading picks up the runtime that travelled with the
             # download, then this device's sync result is applied on
             # top of it.
@@ -500,6 +507,12 @@ class SyncService:
         SaveCloudLibrary.ensure_game_library(game_id)
 
         state = backend.download(game_id)
+
+        #
+        # The download brings the history built on other devices.
+        #
+
+        SaveCloudLibrary.reconcile_versions(game_id)
 
         if not RegistryService.exists(game_id):
             raise FileNotFoundError(
