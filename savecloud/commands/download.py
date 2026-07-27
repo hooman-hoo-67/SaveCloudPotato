@@ -1,29 +1,31 @@
 """
-Download a managed save from the configured storage backend.
+Download a managed save, overwriting whatever this device holds.
 """
 
 from __future__ import annotations
 
 import typer
 
-from savecloud.services.registry import RegistryService
-from savecloud.services.sync import SyncService
+from savecloud.services.sync import StorageUnavailableError, SyncService
+from savecloud.utils.output import require_game
 
 
 def download(
     game_id: str,
 ) -> None:
     """
-    Download a managed save.
+    Download a managed save, overwriting whatever this device holds.
     """
 
-    game = RegistryService.load_game(
-        game_id,
-    )
+    game = require_game(game_id)
 
-    SyncService.download(
-        game,
-    )
+    try:
+        SyncService.download(game)
+
+    except StorageUnavailableError as error:
+        typer.secho(f"✗ {error}", fg=typer.colors.RED)
+
+        raise typer.Exit(code=1)
 
     typer.secho(
         "✓ Save downloaded successfully.",

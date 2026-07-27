@@ -7,8 +7,8 @@ from __future__ import annotations
 import typer
 
 from savecloud.services.library import SaveCloudLibrary
-from savecloud.services.registry import RegistryService
 from savecloud.services.save import SaveService
+from savecloud.utils.output import require_game
 
 
 def snapshot(
@@ -18,9 +18,7 @@ def snapshot(
     Create a snapshot of the current managed save.
     """
 
-    game = RegistryService.load_game(
-        game_id,
-    )
+    game = require_game(game_id)
 
     SaveService.create_version(
         game,

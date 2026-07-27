@@ -7,6 +7,7 @@ facing behaviour rather than re-testing service logic.
 
 from __future__ import annotations
 
+import pytest
 from typer.testing import CliRunner
 
 from savecloud.cli import app
@@ -257,6 +258,95 @@ def test_restore(registered_game, working_save):
     assert invoke("export", GAME_ID).exit_code == 0
 
     assert read_save(working_save) == "original"
+
+
+#
+# Error paths
+#
+
+
+@pytest.mark.parametrize(
+    "command",
+    ["import", "export", "snapshot", "history", "upload", "download"],
+)
+def test_commands_reject_an_unregistered_game(command):
+    """
+    An unknown game must produce a message, not a traceback.
+    """
+
+    result = invoke(command, "nonexistent")
+
+    assert result.exit_code == 1
+    assert "not registered" in result.output
+
+
+def test_restore_rejects_an_unregistered_game():
+
+    result = invoke("restore", "nonexistent", "1")
+
+    assert result.exit_code == 1
+    assert "not registered" in result.output
+
+
+def test_restore_reports_an_unknown_snapshot(registered_game):
+
+    invoke("import", GAME_ID)
+    invoke("snapshot", GAME_ID)
+
+    result = invoke("restore", GAME_ID, "99")
+
+    assert result.exit_code == 1
+    assert "does not exist" in result.output
+    assert "Available snapshots: 1" in result.output
+
+
+def test_commands_point_at_pair_when_the_device_is_not_set_up(registered_game):
+    """
+    A game can be registered without being set up on this machine.
+    """
+
+    from savecloud.services.device import DeviceService
+    from savecloud.services.library import SaveCloudLibrary
+
+    DeviceService.delete_profile(SaveCloudLibrary.device_id(), GAME_ID)
+
+    result = invoke("import", GAME_ID)
+
+    assert result.exit_code == 1
+    assert "not set up on this device" in result.output
+    assert f"savecloud pair {GAME_ID}" in result.output
+
+
+def test_import_reports_a_missing_working_save(registered_game, working_save):
+
+    import shutil
+
+    shutil.rmtree(working_save)
+
+    result = invoke("import", GAME_ID)
+
+    assert result.exit_code == 1
+    assert "does not exist" in result.output
+
+
+def test_upload_reports_unavailable_storage(registered_game):
+
+    ConfigurationService.set_backend("syncthing")
+
+    result = invoke("upload", GAME_ID)
+
+    assert result.exit_code == 1
+    assert "Syncthing" in result.output
+
+
+def test_download_reports_unavailable_storage(registered_game):
+
+    ConfigurationService.set_backend("syncthing")
+
+    result = invoke("download", GAME_ID)
+
+    assert result.exit_code == 1
+    assert "Syncthing" in result.output
 
 
 #
