@@ -461,3 +461,48 @@ Still untested
 - `wrap` on the Steam Deck.
 - A game that forks and detaches rather than exiting, where the
   captured save would be taken while the game was still running.
+
+---
+
+### SaveCloud does not write Steam's shortcuts.vdf
+
+Decision
+
+SaveCloud will not create or modify non-Steam shortcuts. Steam
+integration is achieved entirely through launch options the user sets
+themselves.
+
+Reason
+
+`shortcuts.vdf` holds every non-Steam game, including its
+LaunchOptions, so writing it would let `register` add a game to Steam
+and configure the wrapper in one step. Three things make that a bad
+trade.
+
+Steam is not the only writer. Steam ROM Manager manages the same file
+and regenerates entries on its runs. Two uncoordinated writers means
+either program can silently undo the other's work, and the first real
+installation this was tested against uses exactly that combination.
+
+Steam caches the file in memory and rewrites it on exit, so any edit
+made while Steam is running is discarded. A CLI would have to demand
+Steam be closed, which is a poor thing to require of a command run
+before playing.
+
+The blast radius is disproportionate. The format is binary, and a
+malformed write loses every non-Steam shortcut rather than just the
+one being added - for a ROM library, that is hundreds of entries in
+exchange for saving one paste.
+
+Alternative considered
+
+Reading the file to check whether a game's launch options actually
+invoke SaveCloud, and warning from `doctor` if not. Rejected for now:
+it needs a binary VDF reader to verify a single string, and the failure
+it would catch is already self-announcing - a game launched from Steam
+without the wrapper simply never updates `Last Sync`.
+
+Status
+
+Accepted. Reconsider only if Steam gains a supported way to set launch
+options, or if a read-only check turns out to be worth its machinery.

@@ -73,12 +73,14 @@ mangohud and an Eden AppImage, with the save captured on exit. See
 Builds on the existing backend interface. None should require changes
 to `SyncService`.
 
-### Still open from Milestone 10
+### Not planned
 
-- [ ] non-Steam shortcut creation (`shortcuts.vdf`)
+- non-Steam shortcut creation (`shortcuts.vdf`)
 
-Deferred deliberately: it is binary VDF and mutates Steam's own
-configuration, so it wants its own pass with Steam closed and a backup.
+Dropped rather than deferred. Steam ROM Manager writes the same file,
+Steam discards edits made while it is running, and a malformed write
+loses every non-Steam shortcut. Launch options set by hand achieve the
+same result with none of that. See `docs/DECISIONS.md`.
 
 ---
 
