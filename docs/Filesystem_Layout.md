@@ -5,7 +5,6 @@
 SaveCloud separates synchronized data from device-specific data.
 
 Only data required for cross-device synchronization is synchronized.
-
 Machine-specific information is always stored locally.
 
 ---
@@ -18,7 +17,13 @@ Linux
 ~/.local/share/savecloud/
 ```
 
-Future platforms will use their platform-specific application data directory.
+The location is resolved at runtime and can be overridden with the
+`SAVECLOUD_HOME` environment variable. This is what allows a single
+machine to hold more than one installation, and what keeps the test
+suite away from a developer's real data.
+
+Future platforms will use their platform-specific application data
+directory.
 
 ---
 
@@ -26,14 +31,53 @@ Future platforms will use their platform-specific application data directory.
 
 ```
 savecloud/
-
-library/
-registry/
-device/
-cache/
-logs/
-providers/
+    savecloud.json
+    config.json
+    library/
+    registry/
+    device/
+    cache/
+    logs/
+    providers/
 ```
+
+---
+
+# savecloud.json
+
+Installation metadata created during `savecloud init`.
+
+Fields
+
+- `schema_version`
+- `savecloud_version`
+- `device_id`
+- `device_name`
+- `created_at`
+
+The `device_id` identifies this machine to every other device. It is
+generated once and never regenerated, since doing so would orphan the
+device's synchronization history.
+
+---
+
+# config.json
+
+Installation-wide configuration, owned by `ConfigurationService`.
+
+```json
+{
+    "storage_backend": "local",
+    "storage_root": "/home/user/SaveCloudRemote"
+}
+```
+
+This file is never synchronized. Storage configuration describes this
+installation, not the games it manages, so each device chooses its own
+backend and root.
+
+Unknown keys are ignored on load, so a configuration written by a newer
+version of SaveCloud stays readable.
 
 ---
 
@@ -43,20 +87,14 @@ providers/
 
 Stores the canonical copy of every managed game's save data.
 
-The Library is synchronized between devices.
-
-Example
+The library is synchronized between devices.
 
 ```
 library/
-
-pokemon-scarlet/
-
-current/
-
-versions/
-
-metadata.json
+    pokemon-scarlet/
+        current/
+        versions/
+        metadata.json
 ```
 
 ---
@@ -72,35 +110,37 @@ into the game's working save folder.
 
 # versions/
 
-Stores immutable historical save versions.
-
-Example
+Stores immutable historical save versions, numbered sequentially and
+zero-padded.
 
 ```
 versions/
-
-2026-07-09T18-23-51/
-
-2026-07-08T14-02-17/
-
-2026-07-07T09-51-12/
+    000001/
+    000002/
+    000003/
 ```
 
-Versions are never modified after creation.
+Versions are never modified after creation. Sequential numbering means
+version identity does not depend on a clock, which matters when two
+devices disagree about the time.
+
+A version is created whenever a changed save is captured, whenever a
+restore replaces the current save, and whenever a conflict resolution
+discards one side. Nothing SaveCloud overwrites is unrecoverable.
 
 ---
 
 # metadata.json
 
-Contains metadata about the canonical save.
+Describes the game's library.
 
-Example Fields
+Fields
 
-- Current Version
-- Last Device
-- Last Sync
-- Checksums
-- Save Format Version
+- `current_version`
+- `latest_version`
+- `created_at`
+- `last_import`
+- `last_export`
 
 ---
 
@@ -108,57 +148,60 @@ Example Fields
 
 ## Purpose
 
-Stores synchronized information about every managed game.
-
-Each game owns its own registry directory.
-
-Example
+Stores synchronized information about every managed game. It contains
+no save data.
 
 ```
 registry/
-
-pokemon-scarlet/
-
-manifest.json
-
-runtime.json
+    pokemon-scarlet/
+        manifest.json
+        runtime.json
 ```
 
 ---
 
 # manifest.json
 
-Contains configuration.
+Configuration describing how a game is managed. Changes rarely.
 
-Rarely changes.
+Fields
 
-Example Fields
+- `game_id`
+- `display_name`
+- `launch_type`
+- `platform`
+- `adapter`
+- `backup_enabled`
+- `sync_enabled`
 
-- Game ID
-- Display Name
-- Launch Type
-- Platform
-- Adapter
-- Storage Backend
-- Backup Enabled
-- Sync Enabled
+`storage_backend` was removed in Milestone 8. It now lives in
+`config.json`, because every game on an installation used the same
+value. Manifests that still carry the field load correctly; the value
+is ignored, and `savecloud init` adopts it as the installation default.
 
 ---
 
 # runtime.json
 
-Contains runtime state.
+Frequently changing state describing what is happening now.
 
-Frequently updated.
+Fields
 
-Example Fields
+- `current_version`
+- `last_device`
+- `last_sync`
+- `last_launch`
+- `last_exit`
+- `last_exit_code`
+- `status`
+- `pending_upload`
+- `last_error`
+- `last_sync_checksum`
 
-- Current Version
-- Last Device
-- Last Sync
-- Sync Status
-- Pending Upload
-- Last Error
+`last_sync_checksum` records the save contents at the last successful
+synchronization. It is the common ancestor conflict detection compares
+against; without it, a difference between two devices cannot be
+attributed to either side.
 
 ---
 
@@ -166,144 +209,96 @@ Example Fields
 
 ## Purpose
 
-Stores device-specific configuration.
-
-Never synchronized.
-
-Structure
+Stores machine-specific configuration. Never synchronized.
 
 ```
 device/
-
-desktop/
-
-pokemon-scarlet.json
-
-steamdeck/
-
-pokemon-scarlet.json
+    <device-id>/
+        pokemon-scarlet.json
 ```
 
-Example Fields
+Fields
 
-- Save Path
-- Steam Shortcut ID
-- ROM Path
-- Emulator Path
-- Launch Command
+- `device_id`
+- `device_name`
+- `game_id`
+- `working_save_path`
+- `launch_command`
+- `launcher`
+- `last_local_sync`
+- `enabled`
+
+Save paths and launch commands differ between machines. Synchronizing
+them would overwrite valid local configuration with another device's.
 
 ---
 
 # cache/
 
-Temporary runtime data.
-
-Never synchronized.
-
-Safe to delete.
+Temporary runtime data. Nothing here is required for recovery, and it
+is always safe to delete.
 
 ---
 
 # logs/
 
-Stores application logs.
-
-Never synchronized.
-
-Examples
-
-- launcher.log
-- sync.log
-- errors.log
+Diagnostic output. Never synchronized.
 
 ---
 
 # providers/
 
-Stores provider-specific configuration.
+Provider-specific configuration and credentials. Never synchronized.
 
-Never synchronized.
+---
 
-Examples
+# Remote Layout
 
-- Syncthing
-- Google Drive
-- Dropbox
+Storage backends do not mirror the local layout. They own their own
+structure beneath the configured storage root:
+
+```
+<storage_root>/
+    games/
+        pokemon-scarlet/
+            current/
+            versions/
+            manifest.json
+            runtime.json
+            state.json
+```
+
+The registry documents travel with the save, which is what allows a new
+device to adopt a game without registering it again.
+
+`state.json` records what the backend currently holds:
+
+- `checksum` of the uploaded save
+- `version` it corresponds to
+- `device_id` and `device_name` that uploaded it
+- `updated_at`
+
+Reading it is cheap, so SaveCloud can decide whether a transfer is
+needed without downloading the save first.
 
 ---
 
 # Synchronization Rules
 
-## Synchronized
-
-- library/
-- registry/
-
-## Never Synchronized
-
-- device/
-- cache/
-- logs/
-- providers/
-
----
-
-# Save Lifecycle
+Synchronized
 
 ```
-Game Save Folder
-
-↓
-
-Import into Library/current/
-
-↓
-
-Previous Library/current/
-
-↓
-
-Move into Library/versions/
-
-↓
-
-Update metadata
-
-↓
-
-Update runtime.json
-
-↓
-
-Synchronize Library
-
-↓
-
-Other Device
-
-↓
-
-Import into Working Save Folder
-
-↓
-
-Launch Game
+library/
+registry/
 ```
 
----
+Never synchronized
 
-# Design Rules
-
-1. The Library always contains the canonical save.
-
-2. Games only interact with working copies.
-
-3. Device-specific information is never synchronized.
-
-4. Configuration and runtime state are stored separately.
-
-5. Historical versions are immutable.
-
-6. Storage providers never access game save folders directly.
-
-7. Every synchronized save must exist inside the Library before it can be uploaded.
+```
+device/
+cache/
+logs/
+providers/
+config.json
+savecloud.json
+```

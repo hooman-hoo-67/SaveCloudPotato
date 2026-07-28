@@ -8,12 +8,7 @@ from savecloud.services.registry import RegistryService
 from savecloud.services.device import DeviceService
 from savecloud.services.library import SaveCloudLibrary
 
-app = typer.Typer(
-    invoke_without_command=True,
-)
 
-
-@app.callback()
 def unregister(game_id: str) -> None:
     """
     Unregister a game from SaveCloud.

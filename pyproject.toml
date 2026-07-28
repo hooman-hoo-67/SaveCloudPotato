@@ -15,5 +15,21 @@ dependencies = [
     "platformdirs"
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pyflakes"
+]
+
 [project.scripts]
 savecloud = "savecloud.cli:app"
+
+[tool.setuptools.packages.find]
+include = ["savecloud*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+# Tests import shared fixtures via `from tests.conftest import ...`,
+# which requires the repository root on sys.path.
+pythonpath = ["."]

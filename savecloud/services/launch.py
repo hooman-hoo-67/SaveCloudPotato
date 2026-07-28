@@ -43,14 +43,16 @@ class LaunchService:
 
         if launcher is None:
             raise RuntimeError(
-                "Native launcher is not registered.",
+                f'Unknown launcher: "{profile.launcher}". '
+                f"Available launchers: {', '.join(LauncherRegistry.names())}.",
             )
 
         if not launcher.validate(
             profile.launch_command,
         ):
             raise ValueError(
-                "Invalid launch command.",
+                f"{launcher.display_name()} launcher cannot run this command: "
+                f"{profile.launch_command}",
             )
 
         return launcher.launch(

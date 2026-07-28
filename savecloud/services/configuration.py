@@ -1,29 +1,40 @@
 """
 Installation configuration service.
+
+ConfigurationService owns config.json. It is the only component that
+reads or writes installation-wide settings.
+
+Commands and services must never touch config.json directly.
 """
 
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
+from savecloud.config.constants import config_path, savecloud_home
 from savecloud.models.installation_config import InstallationConfig
 
 
 class ConfigurationService:
     """
-    Manage installation configuration.
+    Load and persist installation-wide configuration.
     """
 
-    CONFIG_FILE = Path.home() / ".local" / "share" / "savecloud" / "config.json"
+    @staticmethod
+    def path():
+        """
+        Return the configuration file path.
+        """
+
+        return config_path()
 
     @staticmethod
     def exists() -> bool:
         """
-        Return True if the configuration exists.
+        Return True if a configuration file exists.
         """
 
-        return ConfigurationService.CONFIG_FILE.exists()
+        return config_path().exists()
 
     @staticmethod
     def default() -> InstallationConfig:
@@ -38,27 +49,20 @@ class ConfigurationService:
         config: InstallationConfig,
     ) -> None:
         """
-        Save the installation configuration.
+        Write the configuration to disk.
         """
 
-        ConfigurationService.CONFIG_FILE.parent.mkdir(
+        savecloud_home().mkdir(
             parents=True,
             exist_ok=True,
         )
 
-        data = {
-            "storage_backend": config.storage_backend,
-            "storage_root": str(
-                config.storage_root,
-            ),
-        }
-
-        with ConfigurationService.CONFIG_FILE.open(
+        with config_path().open(
             "w",
             encoding="utf-8",
         ) as file:
             json.dump(
-                data,
+                config.to_dict(),
                 file,
                 indent=4,
             )
@@ -66,21 +70,84 @@ class ConfigurationService:
     @staticmethod
     def load() -> InstallationConfig:
         """
-        Load the installation configuration.
+        Load the configuration.
+
+        A missing or unreadable configuration falls back to the
+        defaults rather than raising, so that SaveCloud keeps working
+        on a partially initialized installation.
         """
 
-        if not ConfigurationService.exists():
+        path = config_path()
+
+        if not path.exists():
             return ConfigurationService.default()
 
-        with ConfigurationService.CONFIG_FILE.open(
-            "r",
-            encoding="utf-8",
-        ) as file:
-            data = json.load(
-                file,
+        try:
+            with path.open(
+                "r",
+                encoding="utf-8",
+            ) as file:
+                return InstallationConfig.from_dict(
+                    json.load(file),
+                )
+
+        except (json.JSONDecodeError, OSError, TypeError, ValueError):
+            return ConfigurationService.default()
+
+    @staticmethod
+    def initialize() -> InstallationConfig:
+        """
+        Create the configuration file if it does not exist.
+
+        Returns the configuration currently in effect.
+        """
+
+        if ConfigurationService.exists():
+            return ConfigurationService.load()
+
+        config = ConfigurationService.default()
+
+        ConfigurationService.save(config)
+
+        return config
+
+    @staticmethod
+    def set_backend(
+        name: str,
+    ) -> InstallationConfig:
+        """
+        Change the active storage backend.
+        """
+
+        from savecloud.storage import StorageRegistry
+
+        if not StorageRegistry.exists(name):
+            raise ValueError(
+                f'Unknown storage backend: "{name}".',
             )
 
-        return InstallationConfig(
-            storage_backend=data["storage_backend"],
-            storage_root=Path(data["storage_root"]),
-        )
+        config = ConfigurationService.load()
+
+        config.storage_backend = name.lower()
+
+        ConfigurationService.save(config)
+
+        return config
+
+    @staticmethod
+    def set_root(
+        root,
+    ) -> InstallationConfig:
+        """
+        Change the storage root directory.
+        """
+
+        from pathlib import Path
+
+        config = ConfigurationService.load()
+
+        config.storage_root = Path(root).expanduser()
+
+        ConfigurationService.save(config)
+
+        return config

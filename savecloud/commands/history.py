@@ -6,13 +6,10 @@ from __future__ import annotations
 
 import typer
 
-from savecloud.services.registry import RegistryService
 from savecloud.services.save import SaveService
+from savecloud.utils.output import require_game
 
-app = typer.Typer()
 
-
-@app.callback(invoke_without_command=True)
 def history(
     game_id: str,
 ) -> None:
@@ -20,9 +17,7 @@ def history(
     Show available save snapshots.
     """
 
-    game = RegistryService.load_game(
-        game_id,
-    )
+    game = require_game(game_id)
 
     versions = SaveService.list_versions(
         game,

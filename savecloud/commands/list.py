@@ -6,12 +6,7 @@ import typer
 
 from savecloud.services.registry import RegistryService
 
-app = typer.Typer(
-    invoke_without_command=True,
-)
 
-
-@app.callback()
 def list() -> None:
     """
     List all registered games.

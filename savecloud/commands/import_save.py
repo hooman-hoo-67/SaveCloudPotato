@@ -6,15 +6,11 @@ from __future__ import annotations
 
 import typer
 
-from savecloud.services.device import DeviceService
-from savecloud.services.registry import RegistryService
-from savecloud.services.save import SaveService
 from savecloud.services.library import SaveCloudLibrary
+from savecloud.services.save import SaveService
+from savecloud.utils.output import require_game, require_profile
 
-app = typer.Typer()
 
-
-@app.callback(invoke_without_command=True)
 def import_save(
     game_id: str,
 ) -> None:
@@ -22,19 +18,19 @@ def import_save(
     Import the current working save into the SaveCloud library.
     """
 
-    game = RegistryService.load_game(
-        game_id,
-    )
+    game = require_game(game_id)
 
-    profile = DeviceService.load_profile(
-        SaveCloudLibrary.device_id(),
-        game_id,
-    )
+    profile = require_profile(game_id)
 
-    SaveService.import_save(
-        game,
-        profile,
-    )
+    try:
+        SaveService.import_save(game, profile)
+
+    except (FileNotFoundError, NotADirectoryError) as error:
+        typer.secho(f"✗ {error}", fg=typer.colors.RED)
+
+        raise typer.Exit(code=1)
+
+    SaveCloudLibrary.mark_import(game_id)
 
     typer.secho(
         "✓ Save imported successfully.",

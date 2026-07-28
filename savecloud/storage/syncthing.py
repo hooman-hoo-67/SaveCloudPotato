@@ -1,102 +1,116 @@
 """
 Syncthing storage backend.
+
+Syncthing presents itself as an ordinary directory, so transfer works
+exactly as it does for local storage. What differs is availability and
+failure modes:
+
+- The storage root must actually be a folder Syncthing manages,
+  otherwise saves would be written somewhere that never replicates.
+- Syncthing resolves simultaneous edits by preserving both sides as
+  ``*.sync-conflict-*`` files. Those are surfaced rather than silently
+  synchronized into a save.
 """
 
 from __future__ import annotations
 
-from savecloud.models.game import Game
-from savecloud.storage.base import BaseStorageBackend
-from savecloud.storage.registry import StorageRegistry
+from pathlib import Path
+
+from savecloud.services.configuration import ConfigurationService
+from savecloud.storage.filesystem import FilesystemStorageBackend
+
+#
+# Marker directory Syncthing places inside every folder it manages.
+#
+
+FOLDER_MARKER = ".stfolder"
+
+CONFLICT_PATTERN = "*.sync-conflict-*"
 
 
-class SyncthingStorageBackend(
-    BaseStorageBackend,
-):
+class SyncthingStorageBackend(FilesystemStorageBackend):
     """
-    Syncthing storage backend.
-
-    Placeholder implementation until Syncthing integration
-    is implemented.
+    Synchronize the library through a Syncthing folder.
     """
 
     @staticmethod
     def display_name() -> str:
         """
-        Return the backend display name.
+        Human-readable backend name.
         """
 
         return "Syncthing"
 
-    @staticmethod
-    def validate() -> bool:
+    @classmethod
+    def storage_root(cls) -> Path:
         """
-        Validate the backend configuration.
-        """
-
-        return False
-
-    @staticmethod
-    def available(
-        game: Game,
-    ) -> bool:
-        """
-        Return True if the backend is currently available.
+        Return the configured storage root.
         """
 
-        return False
+        return ConfigurationService.load().storage_root
 
-    @staticmethod
-    def exists(
-        game: Game,
-    ) -> bool:
+    @classmethod
+    def marker_path(cls) -> Path:
         """
-        Return True if remote storage exists.
+        Return the expected Syncthing folder marker.
         """
 
-        raise NotImplementedError
+        return cls.storage_root() / FOLDER_MARKER
 
-    @staticmethod
-    def upload(
-        game: Game,
-    ) -> None:
+    @classmethod
+    def available(cls) -> bool:
         """
-        Upload the managed save.
-        """
+        Return True if the storage root is a Syncthing folder.
 
-        raise NotImplementedError
-
-    @staticmethod
-    def download(
-        game: Game,
-    ) -> None:
-        """
-        Download the managed save.
+        Unlike the local backend, this does not create the root. A
+        missing root means Syncthing is not sharing it, and creating it
+        would produce a directory that never replicates.
         """
 
-        raise NotImplementedError
+        root = cls.storage_root()
 
-    @staticmethod
-    def delete(
-        game: Game,
-    ) -> None:
-        """
-        Delete the remote save.
-        """
+        if not root.is_dir():
+            return False
 
-        raise NotImplementedError
+        return cls.marker_path().exists()
 
-    @staticmethod
-    def metadata(
-        game: Game,
-    ) -> dict:
+    @classmethod
+    def unavailable_reason(cls) -> str:
         """
-        Return metadata describing the remote save.
+        Explain why the Syncthing folder is unusable.
         """
 
-        raise NotImplementedError
+        root = cls.storage_root()
 
+        if not root.is_dir():
+            return f"Syncthing folder does not exist: {root}"
 
-StorageRegistry.register(
-    "syncthing",
-    SyncthingStorageBackend,
-)
+        return (
+            f"{root} is not a Syncthing folder "
+            f"(no {FOLDER_MARKER} marker). Share it in Syncthing first, "
+            f"or switch to the local backend."
+        )
+
+    @classmethod
+    def conflicts(
+        cls,
+        game_id: str | None = None,
+    ) -> list[Path]:
+        """
+        Return Syncthing conflict files.
+
+        Parameters
+        ----------
+        game_id
+            Restrict the search to one game. When omitted, the whole
+            storage root is searched.
+        """
+
+        root = cls.game_directory(game_id) if game_id else cls.storage_root()
+
+        if not root.exists():
+            return []
+
+        return sorted(
+            path for path in root.rglob(CONFLICT_PATTERN) if path.is_file()
+        )

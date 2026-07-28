@@ -2,11 +2,10 @@
 Register a game with SaveCloud.
 """
 
-from enum import Enum
-
 import typer
 
 from savecloud.adapters import AdapterRegistry
+from savecloud.launchers import LauncherRegistry
 from savecloud.models.device_profile import DeviceProfile
 from savecloud.models.game import (
     Game,
@@ -18,101 +17,9 @@ from savecloud.models.game import (
 from savecloud.services.device import DeviceService
 from savecloud.services.library import SaveCloudLibrary
 from savecloud.services.registry import RegistryService
-
-from savecloud.storage import StorageRegistry
-
-from savecloud.launchers import LauncherRegistry
+from savecloud.utils.prompt import choose_enum, choose_option, prompt_required
 
 
-def choose_enum(
-    enum_type: type[Enum],
-    title: str,
-):
-    """
-    Prompt the user to choose an enum value from a numbered list.
-    """
-
-    typer.echo()
-    typer.echo(title)
-
-    members = list(enum_type)
-
-    for index, member in enumerate(
-        members,
-        start=1,
-    ):
-        typer.echo(f"{index}. {member.value}")
-
-    while True:
-        choice = typer.prompt(
-            "Choice",
-            type=int,
-        )
-
-        if 1 <= choice <= len(members):
-            return members[choice - 1]
-
-        typer.secho(
-            "Invalid selection. Try again.",
-            fg=typer.colors.RED,
-        )
-
-
-def choose_option(
-    options: list[str],
-    title: str,
-) -> str:
-    """
-    Prompt the user to choose from a list of options.
-    """
-
-    typer.echo()
-    typer.echo(title)
-
-    for index, option in enumerate(
-        options,
-        start=1,
-    ):
-        typer.echo(f"{index}. {option}")
-
-    while True:
-        choice = typer.prompt(
-            "Choice",
-            type=int,
-        )
-
-        if 1 <= choice <= len(options):
-            return options[choice - 1]
-
-        typer.secho(
-            "Invalid selection. Try again.",
-            fg=typer.colors.RED,
-        )
-
-
-def prompt_required(text: str) -> str:
-    """
-    Prompt until a non-empty value is entered.
-    """
-
-    while True:
-        value = typer.prompt(text).strip()
-
-        if value:
-            return value
-
-        typer.secho(
-            "Value cannot be empty.",
-            fg=typer.colors.RED,
-        )
-
-
-app = typer.Typer(
-    invoke_without_command=True,
-)
-
-
-@app.callback()
 def register() -> None:
     """
     Register a game with SaveCloud.
@@ -121,6 +28,18 @@ def register() -> None:
     display_name = prompt_required("Display name")
 
     game_id = prompt_required("Game ID")
+
+    #
+    # Fail before asking anything else if the game already exists.
+    #
+
+    if RegistryService.exists(game_id):
+        typer.secho(
+            f'Game "{game_id}" is already registered.',
+            fg=typer.colors.RED,
+        )
+
+        raise typer.Exit(code=1)
 
     launch_type = choose_enum(
         LaunchType,
@@ -137,38 +56,13 @@ def register() -> None:
         "Select adapter",
     )
 
-    adapter_class = AdapterRegistry.get(
-        adapter,
-    )
+    adapter_class = AdapterRegistry.get(adapter)
 
     assert adapter_class is not None
 
-    storage_backend = choose_option(
-        StorageRegistry.names(),
-        "Select storage backend",
-    )
-
-    backend_class = StorageRegistry.get(
-        storage_backend,
-    )
-
-    assert backend_class is not None
-
-    if not backend_class.validate():
-        typer.secho(
-            f"{backend_class.display_name()} is not configured correctly.",
-            fg=typer.colors.RED,
-        )
-
-        raise typer.Exit(
-            code=1,
-        )
-
     identifier = adapter_class.prompt_identifier()
 
-    working_save_path = adapter_class.locate_save(
-        identifier,
-    )
+    working_save_path = adapter_class.locate_save(identifier)
 
     if working_save_path is None:
         typer.secho(
@@ -176,30 +70,22 @@ def register() -> None:
             fg=typer.colors.RED,
         )
 
-        raise typer.Exit(
-            code=1,
-        )
+        raise typer.Exit(code=1)
 
-    if not adapter_class.validate_save(
-        working_save_path,
-    ):
+    if not adapter_class.validate_save(working_save_path):
         typer.secho(
             f"{adapter_class.display_name()} save directory is invalid.",
             fg=typer.colors.RED,
         )
 
-        raise typer.Exit(
-            code=1,
-        )
+        raise typer.Exit(code=1)
 
     selected_launcher = choose_option(
         LauncherRegistry.names(),
         "Select launcher",
     )
 
-    launch_command = prompt_required(
-        "Launch command",
-    )
+    launch_command = prompt_required("Launch command")
 
     manifest = GameManifest(
         game_id=game_id,
@@ -207,14 +93,11 @@ def register() -> None:
         launch_type=launch_type,
         platform=platform,
         adapter=adapter,
-        storage_backend=storage_backend,
     )
-
-    runtime = GameRuntime()
 
     game = Game(
         manifest=manifest,
-        runtime=runtime,
+        runtime=GameRuntime(),
     )
 
     profile = DeviceProfile(
@@ -226,28 +109,11 @@ def register() -> None:
         launcher=selected_launcher,
     )
 
-    if RegistryService.exists(
-        game.manifest.game_id,
-    ):
-        typer.secho(
-            f'Game "{game.manifest.game_id}" is already registered.',
-            fg=typer.colors.RED,
-        )
-        raise typer.Exit(
-            code=1,
-        )
+    RegistryService.create_registry(game)
 
-    RegistryService.create_registry(
-        game,
-    )
+    SaveCloudLibrary.create_game_library(game)
 
-    SaveCloudLibrary.create_game_library(
-        game,
-    )
-
-    DeviceService.create_profile(
-        profile,
-    )
+    DeviceService.create_profile(profile)
 
     typer.echo()
     typer.echo("✓ Game successfully registered.")

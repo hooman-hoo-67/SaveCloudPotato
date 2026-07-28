@@ -15,7 +15,7 @@ from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 
-from savecloud.config.constants import DEVICE_DIR
+from savecloud.config import layout
 from savecloud.models.device_profile import DeviceProfile
 
 
@@ -27,7 +27,7 @@ class DeviceService:
         """
         Return the directory for a device.
         """
-        return DEVICE_DIR / device_id
+        return layout.device_directory(device_id)
 
     @staticmethod
     def profile_path(
@@ -37,7 +37,7 @@ class DeviceService:
         """
         Return the profile path for a game on a device.
         """
-        return DeviceService.device_directory(device_id) / f"{game_id}.json"
+        return layout.device_profile_path(device_id, game_id)
 
     @staticmethod
     def exists(
@@ -114,7 +114,7 @@ class DeviceService:
 
         last_local_sync = None
 
-        if data["last_local_sync"] is not None:
+        if data.get("last_local_sync") is not None:
             last_local_sync = datetime.fromisoformat(data["last_local_sync"])
 
         return DeviceProfile(
@@ -128,7 +128,24 @@ class DeviceService:
                 "native",
             ),
             last_local_sync=last_local_sync,
-            enabled=data["enabled"],
+            enabled=data.get("enabled", True),
+        )
+
+    @staticmethod
+    def list_profiles(
+        device_id: str,
+    ) -> list[str]:
+        """
+        Return every game ID with a profile on this device.
+        """
+
+        directory = DeviceService.device_directory(device_id)
+
+        if not directory.exists():
+            return []
+
+        return sorted(
+            path.stem for path in directory.glob("*.json") if path.is_file()
         )
 
     @staticmethod
