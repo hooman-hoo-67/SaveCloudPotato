@@ -41,6 +41,10 @@ Storage selection moved out of every game manifest into a single
 - `pair` command for adopting games onto a new device
 - desktop ↔ Steam Deck interoperability, covered end to end by tests
 
+Validated against real Syncthing on two physical devices. See
+`docs/DECISIONS.md` for the acceptance test, including what remains
+unverified about synchronizing mid-replication.
+
 ---
 
 ## Next

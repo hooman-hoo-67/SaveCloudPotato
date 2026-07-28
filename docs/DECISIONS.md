@@ -215,3 +215,66 @@ gives the installation-wide storage root somewhere to take effect.
 Status
 
 Accepted
+
+---
+
+## 2026-07-28
+
+### Milestone 9 acceptance test: real Syncthing, two devices
+
+Context
+
+Until this point the Syncthing backend had unit test coverage but had
+never run against an actual Syncthing installation. The two-device
+tests in `tests/test_multi_device.py` use two SaveCloud installations
+sharing one directory, which exercises the synchronization logic but
+not the replication underneath it.
+
+Setup
+
+- Two physical devices, each with its own SaveCloud installation.
+- Syncthing sharing one folder between them, used as `storage_root`.
+- `savecloud config backend syncthing` on both.
+- `~/.local/share/savecloud/` deliberately NOT shared, so device
+  profiles and `config.json` stay machine-local.
+
+Result
+
+The full workflow behaved as designed: registering on the first
+device, `pair` adopting the game on the second without re-registering
+it, and progress moving in both directions.
+
+Finding: synchronizing before replication completed
+
+`savecloud sync` was run on the second device before Syncthing
+reported the folder "Up to Date", and the outcome was still correct.
+
+This was the failure mode expected to surface first. SaveCloud reads
+the storage root as though it reflects the other device's state, and
+Syncthing updates it asynchronously, so a sync issued mid-replication
+could in principle read a stale or partially written save, record a
+stale checksum as the common ancestor, and manufacture a phantom
+conflict on a later sync.
+
+The likely reason it held: `state.json` is small and written after the
+save it describes, so a partially replicated game usually presents
+either the previous consistent state or the new one, and a checksum
+mismatch resolves to a transfer rather than to corruption.
+
+Status
+
+Observed, not proven.
+
+This is a single successful observation, not a systematic test. It has
+not been run against large saves, slow or interrupted links, or
+simultaneous writes from both devices - the cases where a partially
+replicated directory is most likely to be read as though it were
+complete. Treat mid-replication synchronization as unverified until
+those are covered.
+
+Known gap
+
+`SyncthingStorageBackend.conflicts()` detects the `*.sync-conflict-*`
+files Syncthing writes when it resolves simultaneous edits, but no
+command surfaces them. If Syncthing produces one, SaveCloud currently
+stays silent about it.
