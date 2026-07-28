@@ -56,6 +56,10 @@ unverified about synchronizing mid-replication.
 Steam supplies the command through `wrap`, so both native and
 Proton games work without SaveCloud knowing how to start either.
 
+Validated on a BC250: Steam launching an emulated game through
+mangohud and an Eden AppImage, with the save captured on exit. See
+`docs/DECISIONS.md` for what that run confirmed and what it did not.
+
 ---
 
 ## Next

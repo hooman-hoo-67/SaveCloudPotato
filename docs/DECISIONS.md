@@ -401,3 +401,63 @@ beats incorrect automation, applied where it actually bites.
 Status
 
 Accepted
+
+---
+
+### Milestone 10 acceptance test: Steam launching an emulated game
+
+Context
+
+`wrap` had been exercised against synthetic commands and a simulated
+Steam directory layout, but never against a real Steam client, a real
+launch-options string, or a real emulator.
+
+Setup
+
+- BC250 running the game through Steam.
+- The Steam entry created by Steam ROM Manager, so `%command%` expands
+  to an Eden AppImage invocation with a ROM path.
+- Steam launch options:
+
+      /home/hooman/SaveCloudPotato/.venv/bin/savecloud wrap <game-id> \
+          -- mangohud %command%
+
+- The game registered with the `eden` adapter.
+
+Result
+
+The full chain worked: Steam started SaveCloud, SaveCloud synchronized
+and ran mangohud, mangohud ran Eden, and the save was captured when
+Eden exited.
+
+Finding: the wrapper must be an absolute path
+
+SaveCloud is installed in a virtualenv. Steam does not run launch
+options through a shell that has that virtualenv activated, so a bare
+`savecloud` is not on PATH and the game fails to start with no useful
+error. The absolute path to the virtualenv's script works, because its
+shebang points at the virtualenv's own interpreter.
+
+Worth remembering for any future installation instructions: a wrapper
+invoked by another program cannot assume the environment a terminal
+would have.
+
+Finding: nesting wrappers is fine
+
+`savecloud wrap ... -- mangohud %command%` puts three processes in a
+chain. Each is a child of the last, so Eden's exit still propagates
+back to SaveCloud and the save is captured. Nothing about `wrap`
+assumes it is the immediate parent of the game.
+
+Status
+
+Confirmed for this configuration.
+
+Still untested
+
+- The `steam-proton` adapter against a real Proton game. Prefix
+  discovery and save-directory selection have only been exercised
+  against a constructed directory layout.
+- `wrap` on the Steam Deck.
+- A game that forks and detaches rather than exiting, where the
+  captured save would be taken while the game was still running.

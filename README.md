@@ -95,6 +95,20 @@ Steam starts SaveCloud, SaveCloud syncs and runs the game, then
 captures the save when it exits. Works for native and Proton games
 alike, because Steam supplies the command.
 
+**Use the absolute path** if SaveCloud is installed in a virtualenv.
+Steam does not run launch options through a shell that has it
+activated, so a bare `savecloud` will not be found:
+
+```
+/home/you/SaveCloudPotato/.venv/bin/savecloud wrap <game-id> -- %command%
+```
+
+Other wrappers can be chained after the `--`, and nesting is fine:
+
+```
+... savecloud wrap <game-id> -- mangohud %command%
+```
+
 For Proton games, register with the `steam-proton` adapter: it finds
 the Proton prefix from the App ID and offers the save directories
 inside it.
