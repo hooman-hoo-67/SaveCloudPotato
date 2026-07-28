@@ -9,6 +9,7 @@ import typer
 
 from savecloud.commands import (
     config,
+    doctor,
     download,
     export_save,
     history,
@@ -70,6 +71,12 @@ app.command("pair")(pair.pair)
 #
 
 app.command("play")(play.play)
+
+#
+# Diagnostics
+#
+
+app.command("doctor")(doctor.doctor)
 
 #
 # Configuration

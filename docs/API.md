@@ -145,6 +145,42 @@ synchronized: the local save location, launcher, and launch command.
 
 ---
 
+## Diagnostics
+
+### `savecloud doctor`
+
+Check this installation for problems.
+
+| Option | Effect |
+|--------|--------|
+| `--verbose` / `-v` | Show checks that passed, not only problems |
+| `--strict` | Exit non-zero on warnings as well as errors |
+
+Checks the installation, the configured backend, every registered
+game's registry, library, adapter, device profile, launcher, and
+runtime state, and reports data left behind by games that are no longer
+registered.
+
+Also asks the active backend for anything only it can know about. For
+Syncthing that means `*.sync-conflict-*` files, which SaveCloud never
+reads and would otherwise sit unnoticed.
+
+Every problem is reported with the command that fixes it.
+
+```
+✗ Storage backend
+    /home/user/Sync/SaveCloud is not a Syncthing folder (no .stfolder
+    marker). Share it in Syncthing first, or switch to the local backend.
+
+    → Saves are still captured locally, but nothing will reach your
+      other devices until this is fixed.
+```
+
+Exits `1` if anything is broken, `0` if only warnings were found. Use
+`--strict` in a script that should treat a pending upload as failure.
+
+---
+
 ## Gameplay
 
 ### `savecloud play GAME_ID`

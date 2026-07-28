@@ -76,6 +76,11 @@ Do not create a missing root if its absence means the provider is not
 actually set up. The Syncthing backend refuses rather than creating a
 directory that would silently never replicate.
 
+Override `provider_warnings()` if your provider can end up in a state
+only it can detect - a replication conflict, an expired token, a quota.
+`savecloud doctor` surfaces whatever it returns without knowing what
+the provider is.
+
 ---
 
 ## Adding an Adapter

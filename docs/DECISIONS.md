@@ -278,3 +278,36 @@ Known gap
 files Syncthing writes when it resolves simultaneous edits, but no
 command surfaces them. If Syncthing produces one, SaveCloud currently
 stays silent about it.
+
+---
+
+### Backends report their own problems
+
+Decision
+
+`BaseStorageBackend.provider_warnings()` returns a list of strings and
+defaults to empty. `savecloud doctor` prints whatever the configured
+backend returns, without knowing which backend it is.
+
+Reason
+
+The Syncthing acceptance test above recorded a gap: Syncthing writes
+`*.sync-conflict-*` files when two devices edit the same file at once,
+SaveCloud never reads them, and nothing reported they existed. The save
+they duplicate looks perfectly healthy.
+
+The obvious fix - have diagnostics check for conflict files - would put
+Syncthing-specific knowledge in a service, which is exactly what the
+framework layer exists to prevent. Asking the backend instead keeps
+that knowledge where the rest of Syncthing's behaviour already lives,
+and means a future provider can report an expired token or an exceeded
+quota through the same path with no change to diagnostics.
+
+A provider that raises while reporting is itself reported, rather than
+taking diagnostics down. Diagnostics runs against broken installations
+by definition.
+
+Status
+
+Accepted. Closes the known gap recorded in the milestone 9 acceptance
+test.

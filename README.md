@@ -129,6 +129,7 @@ reversible.
 | `upload` / `download` | Force a direction |
 | `import` / `export` | Move saves in and out of the library |
 | `snapshot` / `history` / `restore` | Version history |
+| `doctor` | Check the installation for problems |
 
 Full reference in [`docs/API.md`](docs/API.md).
 
@@ -149,7 +150,7 @@ one. Set `SAVECLOUD_HOME` to point SaveCloud somewhere else manually.
 | [Architecture](docs/Architecture.md) | Layers, frameworks, synchronization |
 | [Project Scope](docs/Project_Scope.md) | What SaveCloud is and is not |
 | [Filesystem Layout](docs/Filesystem_Layout.md) | On-disk and remote structure |
-| [Data Model](docs/DATA_Model_v0.3.md) | Domain objects |
+| [Data Model](docs/DATA_Model_v0.4.md) | Domain objects |
 | [Decisions](docs/DECISIONS.md) | Why things are the way they are |
 | [Roadmap](docs/RoadMap.md) | Milestones |
 | [Contributing](docs/Contributing.md) | Conventions |

@@ -143,3 +143,18 @@ class BaseStorageBackend(ABC):
         """
 
         raise NotImplementedError
+
+    @classmethod
+    def provider_warnings(cls) -> list[str]:
+        """
+        Report problems specific to this provider.
+
+        Lets a backend surface conditions only it knows about - a
+        replication conflict, an expired token, a quota - without any
+        service having to special-case the provider. Diagnostics simply
+        asks whatever backend is configured.
+
+        Returns an empty list when there is nothing to report.
+        """
+
+        return []

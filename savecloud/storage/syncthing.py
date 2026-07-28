@@ -114,3 +114,32 @@ class SyncthingStorageBackend(FilesystemStorageBackend):
         return sorted(
             path for path in root.rglob(CONFLICT_PATTERN) if path.is_file()
         )
+
+    @classmethod
+    def provider_warnings(cls) -> list[str]:
+        """
+        Report Syncthing conflict files.
+
+        Syncthing resolves simultaneous edits by keeping both sides and
+        renaming one. SaveCloud never reads those files, so a conflict
+        would otherwise sit in the storage root unnoticed while the
+        save it duplicates looks perfectly healthy.
+        """
+
+        if not cls.available():
+            return []
+
+        conflicts = cls.conflicts()
+
+        if not conflicts:
+            return []
+
+        warnings = [
+            f"Syncthing recorded {len(conflicts)} replication conflict "
+            f"file(s). Each one is a copy of a save that two devices "
+            f"changed at the same time.",
+        ]
+
+        warnings.extend(f"  {path}" for path in conflicts)
+
+        return warnings
