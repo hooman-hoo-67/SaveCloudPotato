@@ -17,10 +17,11 @@ It works the same regardless of where a game came from.
 
 ## Current Status
 
-Milestones 1-9 complete. Desktop ↔ Steam Deck synchronization works
-today over a shared folder or Syncthing.
+Milestones 1-10 complete. Desktop ↔ Steam Deck synchronization works
+today over a shared folder or Syncthing, and games can be launched
+from Steam.
 
-Steam integration and cloud providers are next.
+Cloud storage providers are next.
 
 ## How it works
 
@@ -82,6 +83,22 @@ savecloud play <game-id>
 `play` synchronizes, launches the game, waits for it to exit, captures
 the save, and uploads it.
 
+## Steam games
+
+Let Steam do the launching. Set the game's Launch Options to:
+
+```
+savecloud wrap <game-id> -- %command%
+```
+
+Steam starts SaveCloud, SaveCloud syncs and runs the game, then
+captures the save when it exits. Works for native and Proton games
+alike, because Steam supplies the command.
+
+For Proton games, register with the `steam-proton` adapter: it finds
+the Proton prefix from the App ID and offers the save directories
+inside it.
+
 ## Adding a second device
 
 Nothing is registered twice. The game's configuration travels with its
@@ -124,6 +141,7 @@ reversible.
 | `register` / `unregister` | Manage games |
 | `list` / `info` | Inspect games |
 | `play` | Sync, launch, capture, upload |
+| `wrap` | Same, but launched from Steam |
 | `sync` | Synchronize one game or all of them |
 | `pair` | Adopt a game onto this device |
 | `upload` / `download` | Force a direction |

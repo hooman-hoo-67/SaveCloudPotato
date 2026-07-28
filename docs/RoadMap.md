@@ -13,7 +13,7 @@
 | 7 | Storage Framework | ✓ |
 | 8 | Installation Configuration | ✓ |
 | 9 | Filesystem Synchronization | ✓ |
-| 10 | Steam Integration | ☐ |
+| 10 | Steam Integration | ✓ |
 | 11 | Cloud Providers | ☐ |
 
 ---
@@ -45,16 +45,20 @@ Validated against real Syncthing on two physical devices. See
 `docs/DECISIONS.md` for the acceptance test, including what remains
 unverified about synchronizing mid-replication.
 
+### Milestone 10 - Steam Integration
+
+- `steam-proton` adapter, resolving the Proton prefix from an App ID
+  and offering the save directories inside it
+- `SteamLauncher`, and `tracks_process_exit()` so a launcher can
+  declare that it cannot observe the game
+- `savecloud wrap`, which inverts control so Steam starts SaveCloud
+
+Steam supplies the command through `wrap`, so both native and
+Proton games work without SaveCloud knowing how to start either.
+
 ---
 
 ## Next
-
-### Milestone 10 - Steam Integration
-
-- [ ] Steam launcher
-- [ ] Steam Proton adapter
-- [ ] non-Steam shortcut creation
-- [ ] launch wrapper suitable for Steam's launch options
 
 ### Milestone 11 - Cloud Providers
 
@@ -62,8 +66,15 @@ unverified about synchronizing mid-replication.
 - [ ] Dropbox
 - [ ] Nextcloud / WebDAV
 
-Both build on existing framework interfaces. Neither should require
-changes to `SyncService`.
+Builds on the existing backend interface. None should require changes
+to `SyncService`.
+
+### Still open from Milestone 10
+
+- [ ] non-Steam shortcut creation (`shortcuts.vdf`)
+
+Deferred deliberately: it is binary VDF and mutates Steam's own
+configuration, so it wants its own pass with Steam closed and a backup.
 
 ---
 

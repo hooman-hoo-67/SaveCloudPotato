@@ -403,6 +403,33 @@ class DiagnosticsService:
 
             return findings
 
+        #
+        # A launcher that hands off to a client cannot report the
+        # game's exit, so `play` refuses it. That is expected rather
+        # than broken, but the user needs to know how to launch it.
+        #
+
+        if not launcher.tracks_process_exit():
+            findings.append(
+                Finding(
+                    severity=Severity.WARNING,
+                    title=f"Launch through {launcher.display_name()}",
+                    detail=(
+                        f"{launcher.display_name()} cannot report when the "
+                        f"game exits, so `savecloud play` will refuse to "
+                        f"start it and the save would never be captured."
+                    ),
+                    remedy=(
+                        f"Put this in the game's launch options, then "
+                        f"launch it from {launcher.display_name()}:\n"
+                        f"savecloud wrap {game_id} -- %command%"
+                    ),
+                    game_id=game_id,
+                )
+            )
+
+            return findings
+
         if not launcher.validate(profile.launch_command):
             findings.append(
                 Finding(

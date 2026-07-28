@@ -21,7 +21,7 @@ from tests.conftest import GAME_ID
 
 def test_registered_adapters():
 
-    assert AdapterRegistry.names() == ["eden", "manual"]
+    assert AdapterRegistry.names() == ["eden", "manual", "steam-proton"]
     assert AdapterRegistry.get("manual") is ManualAdapter
     assert AdapterRegistry.get("eden") is EdenAdapter
     assert AdapterRegistry.get("dolphin") is None

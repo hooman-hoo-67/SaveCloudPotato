@@ -183,6 +183,37 @@ Exits `1` if anything is broken, `0` if only warnings were found. Use
 
 ## Gameplay
 
+### `savecloud wrap GAME_ID -- COMMAND...`
+
+Run a command supplied by Steam, with synchronization around it.
+
+This is the inverse of `play`: Steam starts SaveCloud and hands it the
+command it would otherwise have run. Put it in the game's **Launch
+Options** in Steam:
+
+```
+savecloud wrap hollow-knight -- %command%
+```
+
+Steam replaces `%command%` with the full invocation, including the
+Proton runtime for a Windows game. SaveCloud synchronizes, runs it,
+waits for it to exit, and captures the save.
+
+| Option | Effect |
+|--------|--------|
+| `--keep-local` | Resolve a conflict in favour of this device |
+| `--keep-remote` | Resolve a conflict in favour of the remote |
+
+SaveCloud's own options must come **before** the game ID, since
+everything after it belongs to the game:
+
+```
+savecloud wrap --keep-local hollow-knight -- %command%
+```
+
+The game's exit code is passed through, so Steam reports what actually
+happened.
+
 ### `savecloud play GAME_ID`
 
 Synchronize, launch, wait for exit, capture the session, and upload.
@@ -194,6 +225,11 @@ Synchronize, launch, wait for exit, capture the session, and upload.
 
 An unresolved conflict prevents launching: playing would build new
 progress on top of a save that is already contested.
+
+`play` refuses launchers that cannot report when the game exits - the
+Steam launcher among them, since `steam -applaunch` returns as soon as
+Steam has been told to start the game. Capturing then would record the
+save from *before* the session. Use `wrap` for those.
 
 Unreachable storage does not prevent playing. The session is captured
 into the library and marked pending, and the next successful sync
@@ -208,7 +244,8 @@ uploads it.
 | 0 | Success |
 | 1 | Command failed (unregistered game, conflict, unavailable storage) |
 | 2 | Usage error (contradictory options) |
-| other | For `play`, the game's own exit code |
+| 127 | For `wrap`, the command could not be executed |
+| other | For `play` and `wrap`, the game's own exit code |
 
 ---
 
@@ -217,3 +254,4 @@ uploads it.
 | Variable | Effect |
 |----------|--------|
 | `SAVECLOUD_HOME` | Override the installation directory |
+| `SAVECLOUD_STEAM_ROOT` | Override Steam's location |

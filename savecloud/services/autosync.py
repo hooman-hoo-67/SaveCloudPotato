@@ -20,6 +20,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+import subprocess
+
+from savecloud.launchers import LauncherRegistry
 from savecloud.models.game import Game
 from savecloud.services.device import DeviceService
 from savecloud.services.launch import LaunchService
@@ -32,6 +35,27 @@ from savecloud.services.sync import (
     SyncConflictError,
     SyncService,
 )
+
+
+class UntrackableLaunchError(RuntimeError):
+    """
+    Raised when a launcher cannot report that the game has exited.
+    """
+
+    def __init__(
+        self,
+        game_id: str,
+        launcher: str,
+    ) -> None:
+
+        super().__init__(
+            f'The "{launcher}" launcher hands the game off to another '
+            f"program and cannot tell when it exits, so the save after "
+            f"the session would never be captured.",
+        )
+
+        self.game_id = game_id
+        self.launcher = launcher
 
 
 @dataclass(slots=True)
@@ -105,36 +129,25 @@ class AutoSyncService:
             game_id,
         )
 
+        #
+        # Refuse before synchronizing. A launcher that cannot report
+        # the game's exit would have this method capture the save from
+        # before the session and mark it synchronized, quietly losing
+        # everything played.
+        #
+
+        launcher = LauncherRegistry.get(profile.launcher)
+
+        if launcher is not None and not launcher.tracks_process_exit():
+            raise UntrackableLaunchError(game_id, profile.launcher)
+
         result = PlayResult(exit_code=0)
 
         #
         # Bring this device up to date before playing.
         #
 
-        if game.manifest.sync_enabled:
-
-            try:
-                result.pre_launch = SyncService.sync(game, resolution)
-
-            except SyncConflictError:
-                #
-                # Never launch into an unresolved conflict.
-                #
-                raise
-
-            except StorageUnavailableError as error:
-                result.warnings.append(
-                    f"Storage unavailable, playing offline: {error}",
-                )
-
-            except Exception as error:
-                result.warnings.append(
-                    f"Synchronization failed, playing offline: {error}",
-                )
-
-        #
-        # Launch.
-        #
+        AutoSyncService.before_launch(game, resolution, result)
 
         game.runtime.mark_running()
 
@@ -143,6 +156,112 @@ class AutoSyncService:
         process = LaunchService.launch(profile)
 
         exit_code = LaunchService.wait(process)
+
+        AutoSyncService.after_exit(game, exit_code, result)
+
+        return result
+
+    @staticmethod
+    def wrap(
+        game: Game,
+        argv: list[str],
+        resolution: ConflictResolution = ConflictResolution.ABORT,
+    ) -> PlayResult:
+        """
+        Run a command supplied by something else, around a sync.
+
+        Used when Steam - or any launcher - starts SaveCloud and hands
+        it the real command to run. The process tree is the right way
+        round: the game is this process's child, so its exit is
+        observable and the save can be captured afterwards.
+
+        No launcher is consulted. The question a launcher answers, "how
+        is this game started", has already been answered by the caller.
+
+        Parameters
+        ----------
+        game
+            Registered game.
+        argv
+            The command to run, already split into arguments.
+        resolution
+            How to resolve a conflict detected before launch.
+
+        Raises
+        ------
+        SyncConflictError
+            If both sides changed and ``resolution`` is ABORT. The game
+            is not started.
+        """
+
+        if not argv:
+            raise ValueError("No command was supplied to run.")
+
+        result = PlayResult(exit_code=0)
+
+        AutoSyncService.before_launch(game, resolution, result)
+
+        game.runtime.mark_running()
+
+        RegistryService.update_runtime(game)
+
+        process = subprocess.Popen(argv)
+
+        exit_code = process.wait()
+
+        AutoSyncService.after_exit(game, exit_code, result)
+
+        return result
+
+    # ------------------------------------------------------------------
+    # Shared lifecycle
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def before_launch(
+        game: Game,
+        resolution: ConflictResolution,
+        result: PlayResult,
+    ) -> None:
+        """
+        Bring this device up to date before the game starts.
+
+        Failures here are recorded and tolerated: an unreachable
+        backend must never stop someone playing. An unresolved conflict
+        is the one exception, and propagates.
+        """
+
+        if not game.manifest.sync_enabled:
+            return
+
+        try:
+            result.pre_launch = SyncService.sync(game, resolution)
+
+        except SyncConflictError:
+            #
+            # Never launch into an unresolved conflict.
+            #
+            raise
+
+        except StorageUnavailableError as error:
+            result.warnings.append(
+                f"Storage unavailable, playing offline: {error}",
+            )
+
+        except Exception as error:
+            result.warnings.append(
+                f"Synchronization failed, playing offline: {error}",
+            )
+
+    @staticmethod
+    def after_exit(
+        game: Game,
+        exit_code: int,
+        result: PlayResult,
+    ) -> None:
+        """
+        Capture and publish the session once the game has exited.
+        """
 
         result.exit_code = exit_code
 
@@ -163,10 +282,10 @@ class AutoSyncService:
 
             RegistryService.update_runtime(game)
 
-            return result
+            return
 
         if not game.manifest.sync_enabled:
-            return result
+            return
 
         #
         # Capture the session into the library before involving the
@@ -183,7 +302,7 @@ class AutoSyncService:
                 f"Could not capture the save into the library: {error}",
             )
 
-            return result
+            return
 
         #
         # Push it if storage is reachable.
@@ -208,5 +327,3 @@ class AutoSyncService:
             result.warnings.append(
                 f"Save kept locally, upload failed: {error}",
             )
-
-        return result

@@ -7,6 +7,7 @@ from __future__ import annotations
 from savecloud.adapters.base import BaseAdapter
 from savecloud.adapters.eden import EdenAdapter
 from savecloud.adapters.manual import ManualAdapter
+from savecloud.adapters.steam_proton import SteamProtonAdapter
 
 
 class AdapterRegistry:
@@ -17,6 +18,7 @@ class AdapterRegistry:
     _ADAPTERS: dict[str, type[BaseAdapter]] = {
         "eden": EdenAdapter,
         "manual": ManualAdapter,
+        "steam-proton": SteamProtonAdapter,
     }
 
     @classmethod

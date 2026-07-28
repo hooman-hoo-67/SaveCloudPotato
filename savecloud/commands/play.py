@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import typer
 
-from savecloud.services.autosync import AutoSyncService
+from savecloud.services.autosync import AutoSyncService, UntrackableLaunchError
 from savecloud.services.registry import RegistryService
 from savecloud.services.sync import SyncConflictError
 from savecloud.utils.output import report_conflict, resolution_from_flags
@@ -50,6 +50,24 @@ def play(
 
         typer.echo()
         typer.echo("The game was not launched.")
+
+        raise typer.Exit(code=1)
+
+    except UntrackableLaunchError as error:
+        typer.secho(
+            f"✗ {error}",
+            fg=typer.colors.RED,
+        )
+
+        typer.echo()
+        typer.echo(
+            "Let Steam start SaveCloud instead. Put this in the game's "
+            "Steam launch options:"
+        )
+        typer.echo()
+        typer.echo(f"    savecloud wrap {game_id} -- %command%")
+        typer.echo()
+        typer.echo("Then launch the game from Steam as usual.")
 
         raise typer.Exit(code=1)
 

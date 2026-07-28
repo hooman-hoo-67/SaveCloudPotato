@@ -25,6 +25,7 @@ from savecloud.commands import (
     sync,
     unregister,
     upload,
+    wrap,
 )
 
 app = typer.Typer(
@@ -71,6 +72,19 @@ app.command("pair")(pair.pair)
 #
 
 app.command("play")(play.play)
+
+#
+# Steam hands the real command through after a -- separator, so
+# unknown options must reach the game rather than click.
+#
+
+app.command(
+    "wrap",
+    context_settings={
+        "ignore_unknown_options": True,
+        "allow_interspersed_args": False,
+    },
+)(wrap.wrap)
 
 #
 # Diagnostics

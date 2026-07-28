@@ -311,3 +311,93 @@ Status
 
 Accepted. Closes the known gap recorded in the milestone 9 acceptance
 test.
+
+---
+
+### A launcher may declare that it cannot observe the game
+
+Decision
+
+`BaseLauncher.tracks_process_exit()` defaults to True. `SteamLauncher`
+returns False, and `AutoSyncService.play()` refuses any launcher that
+does.
+
+Reason
+
+`steam -applaunch` returns as soon as Steam has been told to start the
+game, not when the game exits. Waiting on that process therefore
+proves nothing. `play` would capture the save immediately, upload the
+state from *before* the session, and mark it synchronized - so the
+session's progress would be silently discarded on the next sync, and
+the runtime would claim everything was fine.
+
+Refusing is the only safe option. Warning would not be enough: the
+default path would still destroy progress, and the warning would
+appear before the damage rather than after.
+
+Status
+
+Accepted
+
+---
+
+### Steam starts SaveCloud, not the reverse
+
+Decision
+
+`savecloud wrap <game-id> -- %command%` goes in a game's Steam launch
+options. Steam runs SaveCloud, SaveCloud synchronizes, runs the command
+Steam supplied, waits, and captures the save.
+
+Reason
+
+It fixes the process tree. The game becomes a child of SaveCloud rather
+than of Steam, so its exit is observable and the save can be captured
+afterwards - exactly what the Steam launcher cannot do.
+
+It also removes a whole class of knowledge SaveCloud would otherwise
+need. Steam already knows how to start the game, which Proton build to
+use, and which runtime to inject. `%command%` carries all of it, so
+native and Proton games work identically and no launcher is consulted
+at all.
+
+The command's exit code is passed through, so Steam reports what the
+game did rather than what SaveCloud thought of it.
+
+Consequence
+
+Click must not interpret the game's own options. Pass-through parsing
+is enabled, which means option parsing stops at the game ID, so
+SaveCloud's own flags only work before it. Placing one after would
+otherwise be handed to the game; that case is detected and rejected
+rather than left to fail obscurely.
+
+Status
+
+Accepted
+
+---
+
+### The Proton adapter finds the prefix but asks about the save
+
+Decision
+
+`steam-proton` resolves an App ID to its Proton prefix automatically,
+then presents the directories inside it and asks which holds the save.
+The choice is recorded as `<app-id>:<relative-path>`.
+
+Reason
+
+The prefix is deterministic - `steamapps/compatdata/<app-id>/pfx` - so
+guessing it is safe. What lives inside is not: Windows games use
+AppData/Roaming, AppData/LocalLow, Documents/My Games, and Saved Games
+more or less interchangeably, and plenty invent their own.
+
+Choosing wrong would synchronize the wrong directory and look like it
+was working, which is worse than one extra question during
+registration. This is the project principle that manual configuration
+beats incorrect automation, applied where it actually bites.
+
+Status
+
+Accepted
