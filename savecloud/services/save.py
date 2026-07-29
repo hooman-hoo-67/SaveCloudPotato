@@ -11,11 +11,15 @@ import filecmp
 import shutil
 from pathlib import Path
 
+from savecloud.services import journal
 from savecloud.services.library import SaveCloudLibrary
 from savecloud.models.game import Game
 from savecloud.models.device_profile import DeviceProfile
 from savecloud.utils.filesystem import remove_directory, replace_directory
 from savecloud.utils.hashing import hash_directory
+
+
+log = journal.logger("save")
 
 
 class SaveService:
@@ -229,10 +233,14 @@ class SaveService:
 
         from savecloud.services.configuration import ConfigurationService
 
-        SaveCloudLibrary.prune_versions(
+        removed = SaveCloudLibrary.prune_versions(
             game.manifest.game_id,
             ConfigurationService.load().version_retention,
         )
+
+        log.info("%s: created version %s%s", game.manifest.game_id,
+                 next_version,
+                 f", pruned {len(removed)}" if removed else "")
 
         return next_version
 

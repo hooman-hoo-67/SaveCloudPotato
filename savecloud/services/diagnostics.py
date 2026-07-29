@@ -87,12 +87,17 @@ class DiagnosticsService:
                 )
             ]
 
+        from savecloud.services import journal
+
         return [
             Finding(
                 severity=Severity.OK,
                 title="Installation",
-                detail=f"{SaveCloudLibrary.device_name()} "
-                f"({SaveCloudLibrary.device_id()[:8]})",
+                detail=(
+                    f"{SaveCloudLibrary.device_name()} "
+                    f"({SaveCloudLibrary.device_id()[:8]})\n"
+                    f"Log: {journal.path()}"
+                ),
             )
         ]
 

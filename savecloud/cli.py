@@ -19,6 +19,7 @@ from savecloud.commands import (
     init,
     install as install_command,
     list as list_command,
+    logs as logs_command,
     pair,
     play,
     register,
@@ -150,6 +151,7 @@ app.command(
 #
 
 app.command("doctor")(doctor.doctor)
+app.command("logs")(logs_command.logs)
 
 #
 # Configuration

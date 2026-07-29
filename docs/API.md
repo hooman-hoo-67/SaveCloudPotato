@@ -324,6 +324,23 @@ Every problem is reported with the command that fixes it.
 Exits `1` if anything is broken, `0` if only warnings were found. Use
 `--strict` in a script that should treat a pending upload as failure.
 
+### `savecloud logs`
+
+Show what SaveCloud has been doing.
+
+| Option | Effect |
+|--------|--------|
+| `--lines` / `-n` | How many recent lines to show (default 50) |
+| `--path` | Print the log's location and exit |
+
+`wrap` runs inside Steam, where there is no terminal, so a failed
+upload during a session looks exactly like a successful one. The log
+is where that difference survives.
+
+Set `SAVECLOUD_LOG_LEVEL=DEBUG` for per-file transfer detail, which is
+normally too noisy to keep. Credentials are never written, so a log
+can be attached to a bug report as it is.
+
 ---
 
 ## Gameplay
@@ -422,6 +439,7 @@ lost.
 |----------|--------|
 | `SAVECLOUD_HOME` | Override the installation directory |
 | `SAVECLOUD_STEAM_ROOT` | Override Steam's location |
+| `SAVECLOUD_LOG_LEVEL` | Recording detail; `DEBUG` for a bug report |
 
 ---
 

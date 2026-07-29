@@ -18,7 +18,11 @@ from savecloud.services.library import SaveCloudLibrary
 from savecloud.services.registry import RegistryService
 from savecloud.services.save import SaveService
 from savecloud.storage import StorageRegistry
+from savecloud.services import journal
 from savecloud.storage.base import BaseStorageBackend
+
+
+log = journal.logger("sync")
 
 
 class SyncAction(StrEnum):
@@ -114,9 +118,12 @@ class SyncService:
         backend = SyncService.backend()
 
         if not backend.available():
-            raise StorageUnavailableError(
-                backend.unavailable_reason(),
-            )
+
+            reason = backend.unavailable_reason()
+
+            log.warning("storage unavailable: %s", reason)
+
+            raise StorageUnavailableError(reason)
 
         return backend
 
@@ -412,7 +419,16 @@ class SyncService:
 
         action = SyncService.compare(game, remote)
 
+        log.info("%s: comparison says %s", game_id, action.value)
+
         if action is SyncAction.CONFLICT:
+
+            log.warning(
+                "%s: both sides changed since %s",
+                game_id,
+                (game.runtime.last_sync_checksum or "no recorded ancestor")[:12],
+            )
+
             return SyncService._resolve_conflict(
                 game,
                 remote,

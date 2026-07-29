@@ -27,6 +27,14 @@ def main() -> int:
         return 1
 
     from savecloud.gui.window import MainWindow
+    from savecloud.services import journal
+
+    #
+    # A window has nowhere to print either, and a failure inside a
+    # worker thread is the hardest kind to reproduce afterwards.
+    #
+
+    journal.configure()
 
     app = QApplication(sys.argv)
 

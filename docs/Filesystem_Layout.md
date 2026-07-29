@@ -251,7 +251,15 @@ is always safe to delete.
 
 # logs/
 
-Diagnostic output. Never synchronized.
+What SaveCloud did, in `savecloud.log`, rotated at 1MB with three
+kept. Never synchronized.
+
+`wrap` runs inside Steam with no terminal, so anything it prints goes
+nowhere. This is where a failed pre-launch sync or a failed upload
+after a session survives long enough to be read.
+
+Credentials are never written to it, so it can be attached to a bug
+report unedited.
 
 ---
 

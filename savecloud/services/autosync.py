@@ -24,6 +24,7 @@ import signal
 import subprocess
 
 from savecloud.launchers import LauncherRegistry
+from savecloud.services import journal
 from savecloud.models.game import Game
 from savecloud.services.device import DeviceService
 from savecloud.services.launch import LaunchService
@@ -89,6 +90,15 @@ def _is_ordinary_exit(exit_code: int) -> bool:
         return True
 
     return -exit_code in {int(number) for number in SHUTDOWN_SIGNALS}
+
+
+#
+# The session path is the one with nowhere to print. Steam starts
+# `wrap`, and anything it writes to a terminal that does not exist is
+# the same as writing nothing.
+#
+
+log = journal.logger("session")
 
 
 class UntrackableLaunchError(RuntimeError):
@@ -350,14 +360,24 @@ class AutoSyncService:
             #
             # Never launch into an unresolved conflict.
             #
+
+            log.warning("%s: unresolved conflict, refusing to launch",
+                        game.manifest.game_id)
+
             raise
 
         except StorageUnavailableError as error:
+            log.warning("%s: storage unavailable before launch: %s",
+                        game.manifest.game_id, error)
+
             result.warnings.append(
                 f"Storage unavailable, playing offline: {error}",
             )
 
         except Exception as error:
+            log.warning("%s: pre-launch sync failed: %s",
+                        game.manifest.game_id, error, exc_info=True)
+
             result.warnings.append(
                 f"Synchronization failed, playing offline: {error}",
             )
@@ -373,6 +393,13 @@ class AutoSyncService:
         """
 
         result.exit_code = exit_code
+
+        log.info(
+            "%s: exited with %s (%s)",
+            game.manifest.game_id,
+            exit_code,
+            "ordinary" if _is_ordinary_exit(exit_code) else "unexpected",
+        )
 
         game.runtime.mark_exited(exit_code)
 
@@ -397,11 +424,17 @@ class AutoSyncService:
 
         except Exception as error:
 
+            log.error("%s: could not capture the session: %s",
+                      game.manifest.game_id, error, exc_info=True)
+
             result.warnings.append(
                 f"Could not capture the save into the library: {error}",
             )
 
             return
+
+        log.info("%s: session captured into the library",
+                 game.manifest.game_id)
 
         #
         # An unusual exit is captured but not published, so a crashed
@@ -411,6 +444,9 @@ class AutoSyncService:
         #
 
         if not _is_ordinary_exit(exit_code):
+
+            log.warning("%s: unexpected exit, captured but not published",
+                        game.manifest.game_id)
 
             game.runtime.mark_pending()
 
@@ -435,12 +471,17 @@ class AutoSyncService:
 
             result.uploaded = True
 
+            log.info("%s: session uploaded", game.manifest.game_id)
+
         except Exception as error:
 
             #
             # The save is safe in the library either way. Mark it
             # pending so the next sync pushes it.
             #
+
+            log.warning("%s: upload failed, save kept locally: %s",
+                        game.manifest.game_id, error)
 
             game.runtime.mark_pending()
 

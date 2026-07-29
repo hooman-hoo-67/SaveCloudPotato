@@ -664,6 +664,61 @@ Accepted
 
 ---
 
+## What happened during a session has to survive it
+
+Date: 2026-07-29
+
+Context
+
+`logs/` was created by every installation and nothing had ever written
+to it.
+
+That was tolerable while SaveCloud was run from a terminal by the
+person who wrote it. It stopped being tolerable with a beta: `wrap`
+runs inside Steam, where there is no terminal, so every warning it
+carefully prints goes to a stdout nobody will ever read. A failed
+upload after a Gaming Mode session looks exactly like a successful
+one.
+
+The Gaming Mode bug found earlier is the example. It took reading the
+source to find, because the application left no record of having
+decided anything.
+
+Decision
+
+The interesting moments are written to `logs/savecloud.log`: what
+synchronization compared and decided, what a session did, and every
+failure with its reason. `savecloud logs` reads it back.
+
+Consequences
+
+Nothing in the journal may raise. A log is a convenience; a save is
+not, and failing to write a line must never be why a session is lost.
+Setup failures are swallowed entirely - complaining about the log on
+every command would be worse than not having one.
+
+Credentials are never written, and a test asserts it at DEBUG level
+with real-looking secrets in the credential store. A log that cannot
+be pasted into a bug report unedited would not get pasted at all.
+
+INFO records decisions and failures; DEBUG adds per-file transfer
+detail and is reached through `SAVECLOUD_LOG_LEVEL`, so a bug report
+can ask for more without a rebuild or a flag on every command.
+
+Rotation is small - 1MB, three files. This is read by a person
+diagnosing something recent, not mined, and a beta tester should be
+able to attach one.
+
+The module is called `journal` rather than `logging`, because a module
+named `logging` inside a package that also imports the standard
+library's is a trap for whoever reads it next.
+
+Status
+
+Accepted
+
+---
+
 ## Proton asks two questions, not one
 
 Date: 2026-07-29
