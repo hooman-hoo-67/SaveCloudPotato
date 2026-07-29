@@ -60,6 +60,14 @@ jobs:
   windows:
     runs-on: windows-latest
 
+    #
+    # Not required for a release. The Windows build has never been
+    # exercised, and a platform nobody has asked for yet must not hold
+    # up the one people are waiting on.
+    #
+
+    continue-on-error: true
+
     steps:
       - uses: actions/checkout@v4
 
@@ -90,7 +98,12 @@ jobs:
           path: SaveCloud-windows-x86_64.zip
 
   release:
-    needs: [linux, windows]
+    #
+    # Linux only. Windows runs alongside and its artifact is collected
+    # if it finished, but the release does not wait on it.
+    #
+
+    needs: [linux]
 
     if: startsWith(github.ref, 'refs/tags/')
 
@@ -105,3 +118,42 @@ jobs:
         with:
           files: artifacts/**/*
           generate_release_notes: true
+          #
+          # Anything that is not a plain vX.Y.Z is a prerelease, so a
+          # beta is never presented as finished.
+          #
+          prerelease: ${{ contains(github.ref_name, 'b') || contains(github.ref_name, 'rc') || contains(github.ref_name, 'alpha') }}
+          body: |
+            ## Installing
+
+            Download `SaveCloud-x86_64.AppImage`, make it executable,
+            and run it:
+
+            ```
+            chmod +x SaveCloud-x86_64.AppImage
+            ./SaveCloud-x86_64.AppImage
+            ```
+
+            To type `savecloud` in a terminal and get a menu entry:
+
+            ```
+            ./SaveCloud-x86_64.AppImage install
+            ```
+
+            One file is both the interface and the command line: opened
+            on its own it shows a window, given arguments it behaves
+            like the CLI. That is what makes it usable in Steam launch
+            options:
+
+            ```
+            savecloud wrap <game-id> -- %command%
+            ```
+
+            `savecloud doctor -v` prints the correct line for your
+            machine.
+
+            ## Reporting a problem
+
+            `savecloud --version` reports the build and where it is
+            installed. `savecloud doctor` reports the state of an
+            installation.

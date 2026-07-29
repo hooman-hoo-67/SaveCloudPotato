@@ -569,3 +569,30 @@ def test_unregister_can_be_cancelled(registered_game):
 
     assert result.exit_code == 0
     assert RegistryService.exists(GAME_ID)
+
+
+def test_version_reports_the_build():
+    """
+    A bug report needs to say which build it came from.
+    """
+
+    from savecloud import __version__
+
+    result = runner.invoke(app, ["--version"])
+
+    assert result.exit_code == 0
+
+    assert __version__ in result.output
+
+
+def test_version_matches_the_distribution():
+    """
+    One source of truth. A packaged build carries the version in code
+    rather than in metadata, which PyInstaller need not include.
+    """
+
+    import importlib.metadata
+
+    from savecloud import __version__
+
+    assert importlib.metadata.version("savecloud") == __version__

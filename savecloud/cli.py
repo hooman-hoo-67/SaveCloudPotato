@@ -37,12 +37,44 @@ app = typer.Typer(
 )
 
 
+def version_callback(requested: bool) -> None:
+    """
+    Report the version and how this copy was installed, then stop.
+
+    The second half matters for a bug report: "0.1.0b1" alone does not
+    distinguish a checkout from a downloaded AppImage, and they fail in
+    different ways.
+    """
+
+    if not requested:
+        return
+
+    from savecloud import __version__
+    from savecloud.utils.executable import savecloud_executable
+
+    typer.echo(f"savecloud {__version__}")
+
+    executable = savecloud_executable()
+
+    if executable is not None:
+        typer.echo(str(executable))
+
+    raise typer.Exit()
+
+
 @app.callback()
 def main(
     json_output: bool = typer.Option(
         False,
         "--json",
         help="Emit machine-readable output instead of prose.",
+    ),
+    version: bool = typer.Option(
+        False,
+        "--version",
+        callback=version_callback,
+        is_eager=True,
+        help="Show the version and exit.",
     ),
 ) -> None:
     """

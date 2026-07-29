@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "savecloud"
-version = "0.1.0b1"
+dynamic = ["version"]
 description = "Steam Cloud for everything."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -33,6 +33,9 @@ savecloud = "savecloud.cli:app"
 
 [project.gui-scripts]
 savecloud-gui = "savecloud.gui.app:main"
+
+[tool.setuptools.dynamic]
+version = {attr = "savecloud.__version__"}
 
 [tool.setuptools.packages.find]
 include = ["savecloud*"]

@@ -54,6 +54,19 @@ Safe to run repeatedly. If an installation predates Milestone 8 and its
 manifests all name the same storage backend, that value is adopted as
 the installation default.
 
+### `savecloud --version`
+
+Report the build and where it is installed.
+
+```
+savecloud 0.1.0b1
+/home/user/.local/bin/savecloud
+```
+
+The second line matters for a bug report: a version alone does not
+distinguish a checkout from a downloaded AppImage, and they fail in
+different ways.
+
 ### `savecloud install`
 
 Put `savecloud` on PATH and add a menu entry, both pointing at
