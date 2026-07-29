@@ -68,6 +68,17 @@ class Outcome:
 
 
 @dataclass(slots=True)
+class AdapterChoice:
+    """
+    One adapter, as a form offers it.
+    """
+
+    name: str
+    identifier_name: str
+    identifier_is_path: bool
+
+
+@dataclass(slots=True)
 class Options:
     """
     The choices a form has to offer.
@@ -76,7 +87,7 @@ class Options:
     or launcher appears in the interface without it being changed.
     """
 
-    adapters: list[tuple[str, str]] = field(default_factory=list)
+    adapters: list[AdapterChoice] = field(default_factory=list)
     launchers: list[str] = field(default_factory=list)
     launch_types: list[str] = field(default_factory=list)
     platforms: list[str] = field(default_factory=list)
@@ -573,8 +584,15 @@ class GuiFacade:
 
             adapter = AdapterRegistry.get(name)
 
+            if adapter is None:
+                continue
+
             adapters.append(
-                (name, "" if adapter is None else adapter.identifier_name())
+                AdapterChoice(
+                    name=name,
+                    identifier_name=adapter.identifier_name(),
+                    identifier_is_path=adapter.identifier_is_path(),
+                )
             )
 
         backends = []
@@ -726,6 +744,32 @@ class GuiFacade:
             ok=True,
             game_id=game_id,
             message=f"Registered {display_name.strip()}.",
+        )
+
+    @staticmethod
+    def adapter_for(game_id: str) -> AdapterChoice | None:
+        """
+        The adapter a registered game uses, as a form offers it.
+
+        Returns None for a game this device does not know about yet.
+        """
+
+        from savecloud.adapters import AdapterRegistry
+
+        if not RegistryService.exists(game_id):
+            return None
+
+        name = RegistryService.load_manifest(game_id).adapter
+
+        adapter = AdapterRegistry.get(name)
+
+        if adapter is None:
+            return None
+
+        return AdapterChoice(
+            name=name,
+            identifier_name=adapter.identifier_name(),
+            identifier_is_path=adapter.identifier_is_path(),
         )
 
     @staticmethod

@@ -52,6 +52,14 @@ class ManualAdapter(BaseAdapter):
         return path.exists() and path.is_dir()
 
     @staticmethod
+    def identifier_is_path() -> bool:
+        """
+        The identifier is the save folder itself.
+        """
+
+        return True
+
+    @staticmethod
     def supports_auto_discovery() -> bool:
         return False
 

@@ -66,6 +66,22 @@ class BaseAdapter(ABC):
         raise NotImplementedError
 
     @staticmethod
+    def identifier_is_path() -> bool:
+        """
+        Return whether the identifier is a filesystem path.
+
+        A Title ID and a save folder are not the same question, and an
+        interface that offers to browse for one of them when it wants
+        the other sends people looking through their filesystem for a
+        number.
+
+        Defaults to False, so an adapter that says nothing gets a plain
+        field rather than a misleading Browse button.
+        """
+
+        return False
+
+    @staticmethod
     def supports_auto_discovery() -> bool:
         """
         Return whether this adapter can automatically

@@ -547,3 +547,162 @@ def test_a_home_relative_path_is_expanded(qt_app, tmp_path, monkeypatch):
     assert outcome.ok is True
 
     assert outcome.value == str(save)
+
+
+#
+# What the identifier field asks for
+#
+# A Title ID and a save folder are not the same question. Offering to
+# browse for one when the adapter wants the other sends people looking
+# through their filesystem for a number.
+#
+
+
+def test_adapters_declare_whether_the_identifier_is_a_path():
+
+    from savecloud.adapters import AdapterRegistry
+
+    assert AdapterRegistry.get("manual").identifier_is_path() is True
+
+    assert AdapterRegistry.get("eden").identifier_is_path() is False
+
+    assert AdapterRegistry.get("steam-proton").identifier_is_path() is False
+
+
+def test_an_adapter_that_says_nothing_gets_a_plain_field():
+    """
+    The safe default: a missing Browse button is a smaller mistake
+    than a misleading one.
+    """
+
+    from savecloud.adapters.base import BaseAdapter
+
+    assert BaseAdapter.identifier_is_path() is False
+
+
+def test_browse_is_offered_only_for_a_path(qt_app):
+
+    from savecloud.gui.dialogs import RegisterDialog
+
+    dialog = RegisterDialog()
+
+    dialog.show()
+
+    browse = dialog.identifier_row.browse_button
+
+    dialog.adapter.setCurrentText("manual")
+
+    assert browse.isHidden() is False
+
+    dialog.adapter.setCurrentText("eden")
+
+    assert browse.isHidden() is True
+
+    #
+    # And comes back, rather than being hidden once and forgotten.
+    #
+
+    dialog.adapter.setCurrentText("manual")
+
+    assert browse.isHidden() is False
+
+    dialog.close()
+
+
+def test_a_non_path_field_hints_at_what_it_wants(qt_app):
+
+    from savecloud.gui.dialogs import RegisterDialog
+
+    dialog = RegisterDialog()
+
+    dialog.adapter.setCurrentText("eden")
+
+    assert dialog.identifier.placeholderText() == "Title ID"
+
+    dialog.adapter.setCurrentText("manual")
+
+    assert dialog.identifier.placeholderText() == ""
+
+
+def test_registering_by_title_id_never_touches_the_filesystem(
+    qt_app,
+    monkeypatch,
+    tmp_path,
+):
+    """
+    The whole point: an Eden game is identified by its Title ID.
+    """
+
+    from savecloud.adapters import AdapterRegistry
+    from savecloud.gui.dialogs import ACCEPTED, RegisterDialog
+
+    save = tmp_path / ".local/share/eden/nand/user/save/0100F43008C44000"
+
+    save.mkdir(parents=True)
+
+    monkeypatch.setattr(
+        AdapterRegistry.get("eden"),
+        "locate_save",
+        staticmethod(lambda identifier: save),
+    )
+
+    monkeypatch.setattr(
+        AdapterRegistry.get("eden"),
+        "validate_save",
+        staticmethod(lambda path: True),
+    )
+
+    dialog = RegisterDialog()
+
+    dialog.display_name.setText("Breath of the Wild")
+
+    dialog.adapter.setCurrentText("eden")
+
+    dialog.identifier.setText("0100F43008C44000")
+
+    dialog.launch_command.setText("true")
+
+    dialog.submit()
+
+    assert dialog.result() == ACCEPTED
+
+    assert GuiFacade.detail("breath-of-the-wild").adapter == "eden"
+
+
+def test_the_facade_reports_a_registered_game_s_adapter(registered_game):
+
+    choice = GuiFacade.adapter_for(GAME_ID)
+
+    assert choice.name == "manual"
+
+    assert choice.identifier_is_path is True
+
+
+def test_the_facade_reports_nothing_for_an_unknown_game():
+
+    assert GuiFacade.adapter_for("never-registered") is None
+
+
+def test_pairing_asks_neutrally_until_the_game_is_known(qt_app):
+    """
+    The adapter arrives with the manifest, and the manifest arrives
+    when the game is adopted.
+    """
+
+    from savecloud.gui.dialogs import PairDialog
+
+    dialog = PairDialog(["not-here-yet"])
+
+    assert dialog.identifier_label.text() == "Save location"
+
+
+def test_pairing_asks_specifically_once_the_game_is_known(
+    qt_app,
+    registered_game,
+):
+
+    from savecloud.gui.dialogs import PairDialog
+
+    dialog = PairDialog([GAME_ID])
+
+    assert dialog.identifier_label.text() == "Save Folder"

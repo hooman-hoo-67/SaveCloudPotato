@@ -186,6 +186,14 @@ def _directory_row(field: QLineEdit, parent: QWidget) -> QWidget:
 
     layout.addWidget(button)
 
+    #
+    # Kept reachable so a form whose field stops being a path can hide
+    # it. Offering to browse for a Title ID sends people looking
+    # through their filesystem for a number.
+    #
+
+    row.browse_button = button
+
     return row
 
 
@@ -214,9 +222,9 @@ class RegisterDialog(_Form):
 
         self.adapter = QComboBox()
 
-        self._identifier_names = dict(options.adapters)
+        self._adapters = {choice.name: choice for choice in options.adapters}
 
-        self.adapter.addItems([name for name, _ in options.adapters])
+        self.adapter.addItems([choice.name for choice in options.adapters])
 
         #
         # Whichever sorted first would otherwise win, and reading a
@@ -224,7 +232,7 @@ class RegisterDialog(_Form):
         # person rather than the default.
         #
 
-        if "manual" in self._identifier_names:
+        if "manual" in self._adapters:
             self.adapter.setCurrentText("manual")
 
         self.adapter.currentTextChanged.connect(self._adapter_changed)
@@ -249,10 +257,9 @@ class RegisterDialog(_Form):
 
         self.identifier_label = QLabel()
 
-        self.form.addRow(
-            self.identifier_label,
-            _directory_row(self.identifier, self),
-        )
+        self.identifier_row = _directory_row(self.identifier, self)
+
+        self.form.addRow(self.identifier_label, self.identifier_row)
 
         self.form.addRow("Launcher", self.launcher)
 
@@ -272,9 +279,25 @@ class RegisterDialog(_Form):
         self._adapter_changed(self.adapter.currentText())
 
     def _adapter_changed(self, adapter: str) -> None:
+        """
+        Ask for what this adapter actually wants.
+        """
 
-        self.identifier_label.setText(
-            self._identifier_names.get(adapter, "Identifier")
+        choice = self._adapters.get(adapter)
+
+        if choice is None:
+            self.identifier_label.setText("Identifier")
+
+            return
+
+        self.identifier_label.setText(choice.identifier_name)
+
+        self.identifier_row.browse_button.setVisible(
+            choice.identifier_is_path
+        )
+
+        self.identifier.setPlaceholderText(
+            "" if choice.identifier_is_path else choice.identifier_name
         )
 
     def _suggest_game_id(self, name: str) -> None:
@@ -325,6 +348,8 @@ class PairDialog(_Form):
 
         self.game.addItems(available)
 
+        self.game.currentTextChanged.connect(self._game_changed)
+
         self.identifier = QLineEdit()
 
         self.launcher = QComboBox()
@@ -335,10 +360,11 @@ class PairDialog(_Form):
 
         self.form.addRow("Game in storage", self.game)
 
-        self.form.addRow(
-            "Save folder",
-            _directory_row(self.identifier, self),
-        )
+        self.identifier_label = QLabel("Save location")
+
+        self.identifier_row = _directory_row(self.identifier, self)
+
+        self.form.addRow(self.identifier_label, self.identifier_row)
 
         self.form.addRow("Launcher", self.launcher)
 
@@ -349,14 +375,62 @@ class PairDialog(_Form):
             "cannot be synchronized is asked for here."
         )
 
+        self._game_changed(self.game.currentText())
+
+    def _game_changed(self, game_id: str) -> None:
+        """
+        Ask for whatever this game's adapter needs.
+
+        Which adapter that is arrives with the manifest, and the
+        manifest arrives when the game is adopted - so until then this
+        can only be specific about a game already known here. The
+        field is labelled neutrally in the meantime, and corrected the
+        moment adopting succeeds.
+        """
+
+        choice = self.facade.adapter_for(game_id)
+
+        if choice is None:
+            self.identifier_label.setText("Save location")
+
+            self.identifier_row.browse_button.setVisible(True)
+
+            self.identifier.setPlaceholderText("")
+
+            return
+
+        self.identifier_label.setText(choice.identifier_name)
+
+        self.identifier_row.browse_button.setVisible(
+            choice.identifier_is_path
+        )
+
+        self.identifier.setPlaceholderText(
+            "" if choice.identifier_is_path else choice.identifier_name
+        )
+
     def attempt(self):
 
-        return self.facade.pair(
-            game_id=self.game.currentText(),
+        game_id = self.game.currentText()
+
+        outcome = self.facade.pair(
+            game_id=game_id,
             identifier=self.identifier.text(),
             launcher=self.launcher.currentText(),
             launch_command=self.launch_command.text(),
         )
+
+        #
+        # Adopting downloads the manifest, so after a first attempt the
+        # adapter is known even if locating the save failed. Relabel
+        # before the person tries again, rather than letting them fail
+        # twice against a field asking the wrong question.
+        #
+
+        if not outcome.ok:
+            self._game_changed(game_id)
+
+        return outcome
 
 
 class GameSettingsDialog(_Form):

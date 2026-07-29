@@ -710,6 +710,20 @@ Removing a game asks first and says what is deleted. "Remove" sounds
 reversible; deleting the library is the one action in the interface
 that is not.
 
+Adapters declare whether their identifier is a filesystem path, and
+the form offers Browse only when it is. A Title ID and a save folder
+are not the same question, and a Browse button beside a Title ID field
+sends people looking through their filesystem for a number - reported
+from the field. It defaults to False, so an adapter that says nothing
+gets a plain field: a missing Browse button is a smaller mistake than
+a misleading one.
+
+Pairing cannot know which to ask for. The adapter arrives with the
+manifest, and the manifest arrives when the game is adopted, so the
+field is labelled neutrally until then and corrected the moment
+adopting succeeds - which happens before locating the save, so a first
+failed attempt still leaves the form asking the right question.
+
 The directory picker is built rather than taken from the convenience
 function, so hidden directories can be shown. Emulator saves live
 under `~/.local/share`, and every component after the home directory
