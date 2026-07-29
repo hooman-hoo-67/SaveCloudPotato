@@ -32,6 +32,13 @@ from PySide6.QtWidgets import (
 )
 
 from savecloud.gui import worker
+from savecloud.gui.dialogs import (
+    ACCEPTED,
+    GameSettingsDialog,
+    PairDialog,
+    RegisterDialog,
+    SettingsDialog,
+)
 from savecloud.gui.facade import GameRow, GuiFacade
 
 #
@@ -271,6 +278,31 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(central)
 
         #
+        # Built before the layouts, since a layout that references a
+        # button has to have one.
+        #
+
+        self.add_button = QPushButton("Add game…")
+
+        self.add_button.clicked.connect(self._register)
+
+        self.pair_button = QPushButton("Pair…")
+
+        self.pair_button.clicked.connect(self._pair)
+
+        self.settings_button = QPushButton("Settings…")
+
+        self.settings_button.clicked.connect(self._settings)
+
+        self.game_settings_button = QPushButton("Edit…")
+
+        self.game_settings_button.clicked.connect(self._game_settings)
+
+        self.remove_button = QPushButton("Remove…")
+
+        self.remove_button.clicked.connect(self._unregister)
+
+        #
         # Header: which machine this is, and where saves go.
         #
 
@@ -290,9 +322,25 @@ class MainWindow(QMainWindow):
 
         header.addWidget(self.storage_label)
 
+        header.addWidget(self.settings_button)
+
         header.addWidget(self.refresh_button)
 
         layout.addLayout(header)
+
+        library = QHBoxLayout()
+
+        library.addWidget(self.add_button)
+
+        library.addWidget(self.pair_button)
+
+        library.addWidget(self.game_settings_button)
+
+        library.addWidget(self.remove_button)
+
+        library.addStretch()
+
+        layout.addLayout(library)
 
         #
         # Body: games on the left, whatever is selected on the right.
@@ -386,6 +434,21 @@ class MainWindow(QMainWindow):
             self.auto_sync_box,
         ]
 
+        #
+        # Editing and removing apply to a selection too, but stay
+        # usable for a game not set up on this device: editing is how
+        # a wrong save path gets corrected, and removing is how a game
+        # nobody wants here goes away.
+        #
+
+        self._per_selection = [
+            self.game_settings_button,
+            self.remove_button,
+        ]
+
+        for control in self._per_selection:
+            control.setEnabled(False)
+
         for control in self._per_game:
             control.setEnabled(False)
 
@@ -406,9 +469,12 @@ class MainWindow(QMainWindow):
 
         self._working = True
 
-        for control in self._per_game + [
+        for control in self._per_game + self._per_selection + [
             self.sync_all_button,
             self.refresh_button,
+            self.add_button,
+            self.pair_button,
+            self.settings_button,
         ]:
             control.setEnabled(False)
 
@@ -578,6 +644,146 @@ class MainWindow(QMainWindow):
             "Saving…",
         )
 
+    # ------------------------------------------------------------------
+    # Library and configuration
+    # ------------------------------------------------------------------
+
+    def _register(self) -> None:
+        """
+        Add a game to this device.
+        """
+
+        dialog = RegisterDialog(self.facade)
+
+        if dialog.exec() != ACCEPTED:
+            return
+
+        self.refresh()
+
+        self.games.select(dialog.outcome.game_id)
+
+        self.statusBar().showMessage(dialog.outcome.message, 8000)
+
+    def _pair(self) -> None:
+        """
+        Adopt a game storage already holds.
+        """
+
+        available = self.facade.pairable()
+
+        if not available.ok:
+            QMessageBox.warning(self, "SaveCloud", available.message)
+
+            return
+
+        games = [line for line in available.message.split("\n") if line]
+
+        if not games:
+            QMessageBox.information(
+                self,
+                "SaveCloud",
+                "Storage holds no games this device has not already "
+                "adopted.",
+            )
+
+            return
+
+        dialog = PairDialog(games, self.facade)
+
+        if dialog.exec() != ACCEPTED:
+            return
+
+        self.refresh()
+
+        self.games.select(dialog.outcome.game_id)
+
+        self.statusBar().showMessage(dialog.outcome.message, 8000)
+
+    def _game_settings(self) -> None:
+        """
+        Edit the selected game.
+        """
+
+        game_id = self.games.selected()
+
+        if game_id is None:
+            return
+
+        try:
+            detail = self.facade.detail(game_id)
+
+        except KeyError:
+            return
+
+        dialog = GameSettingsDialog(detail, self.facade)
+
+        if dialog.exec() != ACCEPTED:
+            return
+
+        self.refresh()
+
+        self.games.select(game_id)
+
+        self.statusBar().showMessage("Saved.", 5000)
+
+    def _unregister(self) -> None:
+        """
+        Remove the selected game from this device.
+        """
+
+        game_id = self.games.selected()
+
+        if game_id is None:
+            return
+
+        try:
+            detail = self.facade.detail(game_id)
+
+        except KeyError:
+            return
+
+        #
+        # This deletes the library, which is where versions live. The
+        # confirmation says so, because "remove" sounds reversible and
+        # this is the one action here that is not.
+        #
+
+        confirmed = QMessageBox.question(
+            self,
+            "Remove a game",
+            f"Remove {detail.display_name} from this device?\n\n"
+            f"Its saves and {len(detail.versions)} versions are deleted "
+            f"here. Anything already in storage stays there.",
+        )
+
+        if confirmed is not QMessageBox.Yes:
+            return
+
+        outcome = self.facade.unregister(game_id)
+
+        self.refresh()
+
+        if not outcome.ok:
+            QMessageBox.warning(self, "SaveCloud", outcome.message)
+
+            return
+
+        self.statusBar().showMessage(outcome.message, 8000)
+
+    def _settings(self) -> None:
+        """
+        Change where saves go and how much history is kept.
+        """
+
+        dialog = SettingsDialog(self.facade)
+
+        if dialog.exec() != ACCEPTED:
+            return
+
+        self.refresh()
+
+        QMessageBox.information(self, "SaveCloud", dialog.outcome.message)
+
     def _resolve_conflict(self, outcome) -> None:
         """
         Ask which side to keep.
@@ -654,7 +860,15 @@ class MainWindow(QMainWindow):
 
         self.refresh_button.setEnabled(False)
 
-        self.sync_all_button.setEnabled(not getattr(self, "_working", False))
+        working = getattr(self, "_working", False)
+
+        for control in (
+            self.sync_all_button,
+            self.add_button,
+            self.pair_button,
+            self.settings_button,
+        ):
+            control.setEnabled(not working)
 
         worker.run(
             self.facade.storage,
@@ -712,7 +926,7 @@ class MainWindow(QMainWindow):
         if game_id is None:
             self.detail.show_nothing()
 
-            for control in self._per_game:
+            for control in self._per_game + self._per_selection:
                 control.setEnabled(False)
 
             return
@@ -723,7 +937,7 @@ class MainWindow(QMainWindow):
         except KeyError:
             self.detail.show_error(f'"{game_id}" is no longer registered.')
 
-            for control in self._per_game:
+            for control in self._per_game + self._per_selection:
                 control.setEnabled(False)
 
             return
@@ -733,12 +947,14 @@ class MainWindow(QMainWindow):
         if getattr(self, "_working", False):
             return
 
-        for control in self._per_game:
+        for control in self._per_game + self._per_selection:
             control.setEnabled(True)
 
         #
         # A game with no profile here cannot be played, captured, or
         # restored: nothing knows where its save lives on this machine.
+        # Editing and removing stay available - editing is how the
+        # missing details get supplied.
         #
 
         if not detail.paired:

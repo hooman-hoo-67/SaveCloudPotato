@@ -88,7 +88,8 @@ storage framework.
 - [x] read-only viewer: games, state, history, health
 - [x] sync, play, snapshot, restore, auto-sync toggle
 - [x] conflict resolution
-- [ ] register and pair
+- [x] register, pair, edit, and remove
+- [x] installation settings, including Dropbox credentials
 - [ ] AppImage and Windows packaging
 
 PySide6, importing services in-process. Optional: `pip install
@@ -98,8 +99,11 @@ Actions run on worker threads with the controls locked, because the
 services expect one caller and the interface is the only thing that
 can enforce it. Anything that discards a save asks first.
 
-Registering and pairing are still CLI-only. Both are interactive
-flows, and a wizard is a different piece of work from a button.
+Forms validate through the facade and report failures inside the
+dialog, so a refusal never discards what was typed.
+
+Nothing in the interface is CLI-only any more, apart from `doctor
+--strict` and the deliberate `upload`/`download` overrides.
 
 ### Not planned
 

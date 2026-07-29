@@ -664,6 +664,64 @@ Accepted
 
 ---
 
+## Forms validate in place
+
+Date: 2026-07-29
+
+Context
+
+Registering a game asks for eight things, and the one most likely to
+be wrong - where the save lives - cannot be checked without asking an
+adapter.
+
+A dialog that closes and then reports a failure has thrown away seven
+correct answers along with the wrong one.
+
+Decision
+
+Forms submit through the facade and stay open when it refuses, showing
+the reason inside the dialog with every field still populated.
+
+`locate_save` is exposed separately from `register` for the same
+reason: the save path can be confirmed before anything is written.
+
+Consequences
+
+Dialogs run their work on the interface thread rather than a worker.
+A modal dialog is already blocking, and the alternative is a dialog
+that must survive across a thread boundary to receive its own result.
+Registering is local work; the only slow one is pairing, which
+downloads a library.
+
+The forms read their choices from the registries, so a new adapter or
+launcher appears without the interface being changed. The identifier
+label follows the adapter, because "Title ID" and "Save Folder" are
+not the same question.
+
+The adapter defaults to `manual` rather than whichever sorts first.
+Reading a folder path as a Title ID fails in a way that blames the
+person for the default.
+
+The game ID is suggested from the display name until someone edits it,
+then left alone. A suggestion that overwrites what was typed is not a
+suggestion.
+
+Removing a game asks first and says what is deleted. "Remove" sounds
+reversible; deleting the library is the one action in the interface
+that is not.
+
+Dropbox authorization opens a real browser rather than embedding one.
+The browser someone already trusts with their password is not one this
+application should be reimplementing, and Dropbox hands back a code to
+paste anyway. A reused code is the most common failure and the least
+obvious, so it is named explicitly.
+
+Status
+
+Accepted
+
+---
+
 ## Interface actions return outcomes, not exceptions
 
 Date: 2026-07-29

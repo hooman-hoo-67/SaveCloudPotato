@@ -17,6 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from savecloud.models.device_profile import DeviceProfile
 from savecloud.models.diagnostic import Severity
 from savecloud.services.autosync import auto_sync_enabled
 from savecloud.services.configuration import ConfigurationService
@@ -56,6 +57,43 @@ class Outcome:
     #
 
     conflict: bool = False
+
+    #
+    # A single result the caller asked for - a located save path, for
+    # instance. Named rather than typed, because an interface needs
+    # one string far more often than it needs a schema.
+    #
+
+    value: str = ""
+
+
+@dataclass(slots=True)
+class Options:
+    """
+    The choices a form has to offer.
+
+    Read from the registries rather than hard-coded, so a new adapter
+    or launcher appears in the interface without it being changed.
+    """
+
+    adapters: list[tuple[str, str]] = field(default_factory=list)
+    launchers: list[str] = field(default_factory=list)
+    launch_types: list[str] = field(default_factory=list)
+    platforms: list[str] = field(default_factory=list)
+    backends: list[tuple[str, str, bool]] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class Settings:
+    """
+    Installation-wide configuration, as a form shows it.
+    """
+
+    backend: str
+    root: str
+    retention: int
+    needs_credentials: bool
+    has_credentials: bool
 
 
 @dataclass(slots=True)
@@ -513,6 +551,530 @@ class GuiFacade:
             game_id=game_id,
             message="\n".join(lines),
         )
+
+
+    # ------------------------------------------------------------------
+    # Registration and pairing
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def options() -> Options:
+        """
+        Everything a form needs to populate its choices.
+        """
+
+        from savecloud.adapters import AdapterRegistry
+        from savecloud.launchers import LauncherRegistry
+        from savecloud.models.game import LaunchType, Platform
+
+        adapters = []
+
+        for name in AdapterRegistry.names():
+
+            adapter = AdapterRegistry.get(name)
+
+            adapters.append(
+                (name, "" if adapter is None else adapter.identifier_name())
+            )
+
+        backends = []
+
+        for name in StorageRegistry.names():
+
+            backend = StorageRegistry.get(name)
+
+            backends.append(
+                (
+                    name,
+                    name if backend is None else backend.display_name(),
+                    bool(backend and backend.requires_setup()),
+                )
+            )
+
+        return Options(
+            adapters=adapters,
+            launchers=list(LauncherRegistry.names()),
+            launch_types=[member.value for member in LaunchType],
+            platforms=[member.value for member in Platform],
+            backends=backends,
+        )
+
+    @staticmethod
+    def locate_save(adapter: str, identifier: str) -> Outcome:
+        """
+        Ask an adapter where a save lives, and whether it looks right.
+
+        Separate from registering so a form can confirm the path
+        before anything is written - the one part of registration that
+        commonly fails, and the one worth showing before committing.
+        """
+
+        from savecloud.adapters import AdapterRegistry
+
+        implementation = AdapterRegistry.get(adapter)
+
+        if implementation is None:
+            return Outcome(ok=False, message=f'Unknown adapter: "{adapter}".')
+
+        if not identifier.strip():
+            return Outcome(
+                ok=False,
+                message=f"{implementation.identifier_name()} is required.",
+            )
+
+        try:
+            path = implementation.locate_save(identifier.strip())
+
+        except Exception as error:
+            return Outcome(ok=False, message=str(error))
+
+        if path is None:
+            return Outcome(
+                ok=False,
+                message=(
+                    f"No save directory found for that "
+                    f"{implementation.identifier_name().lower()}."
+                ),
+            )
+
+        if not implementation.validate_save(path):
+            return Outcome(
+                ok=False,
+                message=f"{path} does not look like a valid save directory.",
+                value=str(path),
+            )
+
+        return Outcome(ok=True, message=str(path), value=str(path))
+
+    @staticmethod
+    def register(
+        game_id: str,
+        display_name: str,
+        launch_type: str,
+        platform: str,
+        adapter: str,
+        identifier: str,
+        launcher: str,
+        launch_command: str,
+    ) -> Outcome:
+        """
+        Register a game on this device.
+        """
+
+        from savecloud.models.game import (
+            Game,
+            GameManifest,
+            GameRuntime,
+            LaunchType,
+            Platform,
+        )
+
+        game_id = game_id.strip()
+
+        if not game_id:
+            return Outcome(ok=False, message="Game ID is required.")
+
+        if not display_name.strip():
+            return Outcome(ok=False, message="Display name is required.")
+
+        if RegistryService.exists(game_id):
+            return Outcome(
+                ok=False,
+                game_id=game_id,
+                message=f'"{game_id}" is already registered.',
+            )
+
+        located = GuiFacade.locate_save(adapter, identifier)
+
+        if not located.ok:
+            return located
+
+        if not launch_command.strip():
+            return Outcome(ok=False, message="Launch command is required.")
+
+        try:
+            game = Game(
+                manifest=GameManifest(
+                    game_id=game_id,
+                    display_name=display_name.strip(),
+                    launch_type=LaunchType(launch_type),
+                    platform=Platform(platform),
+                    adapter=adapter,
+                ),
+                runtime=GameRuntime(),
+            )
+
+            RegistryService.create_registry(game)
+
+            SaveCloudLibrary.create_game_library(game)
+
+            DeviceService.create_profile(
+                DeviceProfile(
+                    device_id=SaveCloudLibrary.device_id(),
+                    device_name=SaveCloudLibrary.device_name(),
+                    game_id=game_id,
+                    working_save_path=Path(located.value),
+                    launch_command=launch_command.strip(),
+                    launcher=launcher,
+                )
+            )
+
+        except Exception as error:
+            return Outcome(ok=False, game_id=game_id, message=str(error))
+
+        return Outcome(
+            ok=True,
+            game_id=game_id,
+            message=f"Registered {display_name.strip()}.",
+        )
+
+    @staticmethod
+    def pairable() -> Outcome:
+        """
+        Games storage holds that this device has not adopted.
+
+        The message carries them newline-separated, because an Outcome
+        is what every action returns and a list of names does not
+        justify a second shape.
+        """
+
+        try:
+            remote = SyncService.remote_games()
+
+        except Exception as error:
+            return Outcome(ok=False, message=str(error))
+
+        device_id = SaveCloudLibrary.device_id()
+
+        available = [
+            game_id
+            for game_id in remote
+            if not DeviceService.exists(device_id, game_id)
+        ]
+
+        return Outcome(ok=True, message="\n".join(sorted(available)))
+
+    @staticmethod
+    def pair(
+        game_id: str,
+        identifier: str,
+        launcher: str,
+        launch_command: str,
+    ) -> Outcome:
+        """
+        Adopt a game that exists in storage onto this device.
+
+        The adapter comes with the downloaded manifest, so only the
+        things that cannot be synchronized are asked for.
+        """
+
+        try:
+            game = SyncService.adopt(game_id)
+
+        except Exception as error:
+            return Outcome(ok=False, game_id=game_id, message=str(error))
+
+        located = GuiFacade.locate_save(game.manifest.adapter, identifier)
+
+        if not located.ok:
+            return located
+
+        if not launch_command.strip():
+            return Outcome(ok=False, message="Launch command is required.")
+
+        try:
+            DeviceService.create_profile(
+                DeviceProfile(
+                    device_id=SaveCloudLibrary.device_id(),
+                    device_name=SaveCloudLibrary.device_name(),
+                    game_id=game_id,
+                    working_save_path=Path(located.value),
+                    launch_command=launch_command.strip(),
+                    launcher=launcher,
+                )
+            )
+
+        except Exception as error:
+            return Outcome(ok=False, game_id=game_id, message=str(error))
+
+        return Outcome(
+            ok=True,
+            game_id=game_id,
+            message=f"Paired {game.manifest.display_name} with this device.",
+        )
+
+    # ------------------------------------------------------------------
+    # Editing
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def update_game(
+        game_id: str,
+        display_name: str,
+        sync_enabled: bool,
+        backup_enabled: bool,
+    ) -> Outcome:
+        """
+        Change a game's synchronized configuration.
+
+        The manifest is frozen, so this replaces it rather than
+        mutating it - configuration that changes rarely should not be
+        quietly editable in memory.
+        """
+
+        from dataclasses import replace
+
+        if not display_name.strip():
+            return Outcome(ok=False, message="Display name is required.")
+
+        try:
+            manifest = RegistryService.load_manifest(game_id)
+
+            RegistryService.save_registry_manifest(
+                replace(
+                    manifest,
+                    display_name=display_name.strip(),
+                    sync_enabled=sync_enabled,
+                    backup_enabled=backup_enabled,
+                )
+            )
+
+        except Exception as error:
+            return Outcome(ok=False, game_id=game_id, message=str(error))
+
+        return Outcome(ok=True, game_id=game_id, message="Saved.")
+
+    @staticmethod
+    def update_profile(
+        game_id: str,
+        working_save_path: str,
+        launcher: str,
+        launch_command: str,
+    ) -> Outcome:
+        """
+        Change how this device reaches a game.
+        """
+
+        device_id = SaveCloudLibrary.device_id()
+
+        if not DeviceService.exists(device_id, game_id):
+            return Outcome(
+                ok=False,
+                game_id=game_id,
+                message="This game is not set up on this device.",
+            )
+
+        path = Path(working_save_path).expanduser()
+
+        if not path.is_dir():
+            return Outcome(
+                ok=False,
+                game_id=game_id,
+                message=f"{path} is not a directory.",
+            )
+
+        if not launch_command.strip():
+            return Outcome(ok=False, message="Launch command is required.")
+
+        profile = DeviceService.load_profile(device_id, game_id)
+
+        profile.working_save_path = path
+
+        profile.launcher = launcher
+
+        profile.launch_command = launch_command.strip()
+
+        DeviceService.save_profile(profile)
+
+        return Outcome(ok=True, game_id=game_id, message="Saved.")
+
+    @staticmethod
+    def unregister(game_id: str) -> Outcome:
+        """
+        Remove a game's registry entry, library, and local profile.
+        """
+
+        try:
+            RegistryService.delete_registry(game_id)
+
+            SaveCloudLibrary.delete_game_library(game_id)
+
+            device_id = SaveCloudLibrary.device_id()
+
+            if DeviceService.exists(device_id, game_id):
+                DeviceService.delete_profile(device_id, game_id)
+
+        except Exception as error:
+            return Outcome(ok=False, game_id=game_id, message=str(error))
+
+        return Outcome(
+            ok=True,
+            message=f"Removed {game_id} from this device.",
+        )
+
+    # ------------------------------------------------------------------
+    # Installation settings
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def settings() -> Settings:
+        """
+        The installation's own configuration.
+        """
+
+        from savecloud.services.credentials import CredentialService
+
+        config = ConfigurationService.load()
+
+        backend = StorageRegistry.get(config.storage_backend)
+
+        needs = bool(backend and backend.requires_setup())
+
+        return Settings(
+            backend=config.storage_backend,
+            root=str(config.storage_root),
+            retention=config.version_retention,
+            needs_credentials=needs,
+            has_credentials=(
+                CredentialService.exists(config.storage_backend)
+                if needs
+                else True
+            ),
+        )
+
+    @staticmethod
+    def save_settings(
+        backend: str,
+        root: str,
+        retention: int,
+    ) -> Outcome:
+        """
+        Change where saves go and how much history is kept.
+
+        Retention is applied rather than only recorded, matching what
+        `config retention` does: a window that took effect at some
+        unpredictable later moment would read as one that did nothing.
+        """
+
+        try:
+            ConfigurationService.set_backend(backend)
+
+            ConfigurationService.set_root(Path(root).expanduser())
+
+            config = ConfigurationService.set_retention(int(retention))
+
+        except Exception as error:
+            return Outcome(ok=False, message=str(error))
+
+        removed = SaveService.apply_retention(config.version_retention)
+
+        lines = ["Settings saved."]
+
+        if removed:
+            trimmed = sum(len(versions) for versions in removed.values())
+
+            lines.append(f"Removed {trimmed} versions beyond the window.")
+
+        try:
+            remote = SyncService.prune_remote(config.version_retention)
+
+        except Exception:
+            #
+            # Storage catches up on the next upload. Failing to reach
+            # it is not a reason to reject the setting.
+            #
+            remote = {}
+
+            lines.append("Storage was not trimmed; it will be on next upload.")
+
+        if remote:
+            trimmed = sum(len(versions) for versions in remote.values())
+
+            lines.append(f"Removed {trimmed} versions from storage.")
+
+        return Outcome(ok=True, message="\n".join(lines))
+
+    @staticmethod
+    def dropbox_authorize_url(app_key: str) -> Outcome:
+        """
+        The URL that grants SaveCloud access to a Dropbox account.
+        """
+
+        from savecloud.storage.dropbox_setup import authorize_url
+
+        if not app_key.strip():
+            return Outcome(ok=False, message="App key is required.")
+
+        return Outcome(ok=True, value=authorize_url(app_key.strip()))
+
+    @staticmethod
+    def save_dropbox_credentials(
+        app_key: str,
+        app_secret: str,
+        code: str,
+    ) -> Outcome:
+        """
+        Exchange an authorization code for a refresh token and store it.
+        """
+
+        from savecloud.services.credentials import CredentialService
+        from savecloud.storage.dropbox import PROVIDER, DropboxStorageBackend
+        from savecloud.storage.dropbox_setup import exchange_code
+
+        missing = [
+            label
+            for label, value in (
+                ("App key", app_key),
+                ("App secret", app_secret),
+                ("Authorization code", code),
+            )
+            if not value.strip()
+        ]
+
+        if missing:
+            return Outcome(
+                ok=False,
+                message=f"{', '.join(missing)} required.",
+            )
+
+        try:
+            response = exchange_code(
+                app_key.strip(),
+                app_secret.strip(),
+                code.strip(),
+            )
+
+        except Exception as error:
+            return Outcome(ok=False, message=str(error))
+
+        refresh_token = response.get("refresh_token")
+
+        if not refresh_token:
+            return Outcome(
+                ok=False,
+                message=(
+                    "Dropbox did not return a refresh token. The "
+                    "authorization code may already have been used - "
+                    "each one works once."
+                ),
+            )
+
+        CredentialService.save(
+            PROVIDER,
+            {
+                "app_key": app_key.strip(),
+                "app_secret": app_secret.strip(),
+                "refresh_token": refresh_token,
+            },
+        )
+
+        #
+        # The cached client holds the previous credentials.
+        #
+
+        DropboxStorageBackend.reset()
+
+        return Outcome(ok=True, message="Dropbox is set up on this device.")
 
 
 def _device(recorded: str | None, here: str) -> str:
