@@ -145,6 +145,29 @@ class BaseStorageBackend(ABC):
         raise NotImplementedError
 
     @classmethod
+    @abstractmethod
+    def prune(
+        cls,
+        game_id: str,
+        keep: int,
+    ) -> list[str]:
+        """
+        Discard stored versions beyond the newest ``keep``.
+
+        Returns the version names that were removed.
+
+        Pushing trims as it goes, so this exists for the case pushing
+        never reaches: a retention window that changed while the save
+        did not. Abstract rather than a no-op default, because a
+        backend that silently ignored retention would grow without
+        bound and nothing would say so.
+
+        A ``keep`` of zero keeps everything.
+        """
+
+        raise NotImplementedError
+
+    @classmethod
     def requires_setup(cls) -> bool:
         """
         Return whether this backend needs credentials before use.

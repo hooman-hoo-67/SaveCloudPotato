@@ -35,6 +35,44 @@ class SaveService:
     """
 
     @staticmethod
+    def apply_retention(keep: int | None = None) -> dict[str, list[int]]:
+        """
+        Enforce the retention window across every registered game.
+
+        Versions are normally trimmed as they are created, which never
+        touches a game whose save has not changed. Lowering the window
+        would then appear to do nothing until the next play session,
+        so setting it applies it.
+
+        Returns the versions removed, keyed by game ID, omitting games
+        that had nothing to remove.
+
+        Parameters
+        ----------
+        keep
+            Window to apply. Defaults to the configured one.
+        """
+
+        from savecloud.services.configuration import ConfigurationService
+        from savecloud.services.registry import RegistryService
+
+        if keep is None:
+            keep = ConfigurationService.load().version_retention
+
+        removed: dict[str, list[int]] = {}
+
+        for game in RegistryService.list_games():
+
+            game_id = game.manifest.game_id
+
+            pruned = SaveCloudLibrary.prune_versions(game_id, keep)
+
+            if pruned:
+                removed[game_id] = pruned
+
+        return removed
+
+    @staticmethod
     def current_save(game: Game) -> Path:
         """
         Return the current managed save directory.

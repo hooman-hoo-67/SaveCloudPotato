@@ -456,14 +456,14 @@ class FilesystemStorageBackend(BaseStorageBackend):
             only=retained,
         )
 
-        cls._prune_versions(game_id, keep)
+        cls.prune(game_id, keep)
 
     @classmethod
-    def _prune_versions(
+    def prune(
         cls,
         game_id: str,
         keep: int,
-    ) -> None:
+    ) -> list[str]:
         """
         Delete remote versions beyond the newest ``keep``.
 
@@ -473,20 +473,24 @@ class FilesystemStorageBackend(BaseStorageBackend):
         """
 
         if keep <= 0:
-            return
+            return []
 
         remote = cls.versions_directory(game_id)
 
         if not remote.exists():
-            return
+            return []
 
         names = sorted(
             (directory.name for directory in remote.iterdir() if directory.is_dir()),
             reverse=True,
         )
 
-        for name in names[keep:]:
+        doomed = names[keep:]
+
+        for name in doomed:
             remove_directory(remote / name)
+
+        return sorted(doomed)
 
     @classmethod
     def _pull_versions(

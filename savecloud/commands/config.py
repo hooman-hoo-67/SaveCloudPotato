@@ -9,6 +9,8 @@ from pathlib import Path
 import typer
 
 from savecloud.services.configuration import ConfigurationService
+from savecloud.services.save import SaveService
+from savecloud.services.sync import SyncService
 from savecloud.storage import StorageRegistry
 
 app = typer.Typer(
@@ -205,11 +207,48 @@ def retention(
         fg=typer.colors.GREEN,
     )
 
-    typer.echo()
-    typer.echo(
-        "Older versions are deleted the next time a save is captured, "
-        "locally and in storage."
-    )
+    #
+    # Trimming normally happens as versions are created, which would
+    # leave a game nobody has played still holding its old history.
+    # Setting the window applies it.
+    #
+
+    removed = SaveService.apply_retention(config.version_retention)
+
+    for game_id, versions in sorted(removed.items()):
+        typer.echo(
+            f"  {game_id}: removed {len(versions)} version"
+            f"{'' if len(versions) == 1 else 's'} locally"
+        )
+
+    try:
+        remote = SyncService.prune_remote(config.version_retention)
+
+    #
+    # Any backend failure is reported rather than raised: the setting
+    # was saved, and storage catches up on the next upload regardless.
+    #
+
+    except Exception as error:
+        typer.echo()
+        typer.secho(
+            f"Storage was not trimmed: {error}",
+            fg=typer.colors.YELLOW,
+        )
+
+        typer.echo("It will be trimmed on the next upload.")
+
+        return
+
+    for game_id, versions in sorted(remote.items()):
+        typer.echo(
+            f"  {game_id}: removed {len(versions)} version"
+            f"{'' if len(versions) == 1 else 's'} from storage"
+        )
+
+    if not removed and not remote:
+        typer.echo()
+        typer.echo("Nothing to remove; history is already within the window.")
 
 
 @app.command("provider")

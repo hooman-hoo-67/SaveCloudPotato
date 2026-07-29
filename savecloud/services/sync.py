@@ -485,6 +485,42 @@ class SyncService:
         return SyncService.require_backend().list_games()
 
     @staticmethod
+    def prune_remote(keep: int | None = None) -> dict[str, list[str]]:
+        """
+        Enforce the retention window on the backend.
+
+        Storage is trimmed during a push, so this covers the same gap
+        `SaveService.apply_retention` covers locally: a window that
+        changed while the saves did not.
+
+        Returns the version names removed, keyed by game ID, omitting
+        games that had nothing to remove.
+
+        Raises
+        ------
+        StorageUnavailableError
+            If the backend cannot be reached.
+        """
+
+        from savecloud.services.configuration import ConfigurationService
+
+        if keep is None:
+            keep = ConfigurationService.load().version_retention
+
+        backend = SyncService.require_backend()
+
+        removed: dict[str, list[str]] = {}
+
+        for game_id in backend.list_games():
+
+            pruned = backend.prune(game_id, keep)
+
+            if pruned:
+                removed[game_id] = pruned
+
+        return removed
+
+    @staticmethod
     def adopt(
         game_id: str,
     ) -> Game:

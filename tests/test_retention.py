@@ -370,3 +370,171 @@ def test_device_profiles_are_untouched_by_retention(registered_game, working_sav
     play_sessions(registered_game, working_save, 5)
 
     assert DeviceService.exists(SaveCloudLibrary.device_id(), GAME_ID)
+
+
+#
+# Applying a changed window
+#
+# Versions are trimmed as they are created, which never reaches a game
+# whose save has not changed since. Lowering the window would then
+# appear to do nothing until the next play session.
+#
+
+
+def test_lowering_the_window_prunes_an_untouched_game(
+    registered_game,
+    working_save,
+):
+
+    ConfigurationService.set_retention(0)
+
+    play_sessions(registered_game, working_save, 6)
+
+    assert len(SaveService.list_versions(RegistryService.load_game(GAME_ID))) == 6
+
+    #
+    # No save changes between here and the assertion: only the setting.
+    #
+
+    result = runner.invoke(app, ["config", "retention", "2"])
+
+    assert result.exit_code == 0
+
+    assert len(SaveService.list_versions(RegistryService.load_game(GAME_ID))) == 2
+
+
+def test_lowering_the_window_prunes_storage(registered_game, working_save):
+
+    ConfigurationService.set_retention(0)
+
+    play_sessions(registered_game, working_save, 6)
+
+    remote = LocalStorageBackend.versions_directory(GAME_ID)
+
+    assert len([path for path in remote.iterdir() if path.is_dir()]) == 6
+
+    runner.invoke(app, ["config", "retention", "2"])
+
+    assert len([path for path in remote.iterdir() if path.is_dir()]) == 2
+
+
+def test_applying_the_window_keeps_the_newest(registered_game, working_save):
+
+    ConfigurationService.set_retention(0)
+
+    play_sessions(registered_game, working_save, 5)
+
+    runner.invoke(app, ["config", "retention", "2"])
+
+    game = RegistryService.load_game(GAME_ID)
+
+    versions = SaveService.list_versions(game)
+
+    newest = read_save(SaveCloudLibrary.version_directory(GAME_ID, versions[-1]))
+
+    assert newest == "session 4"
+
+
+def test_raising_the_window_removes_nothing(registered_game, working_save):
+
+    play_sessions(registered_game, working_save, 4)
+
+    before = SaveService.list_versions(RegistryService.load_game(GAME_ID))
+
+    runner.invoke(app, ["config", "retention", "9"])
+
+    assert SaveService.list_versions(RegistryService.load_game(GAME_ID)) == before
+
+
+def test_unlimited_retention_removes_nothing(registered_game, working_save):
+
+    ConfigurationService.set_retention(0)
+
+    play_sessions(registered_game, working_save, 4)
+
+    result = runner.invoke(app, ["config", "retention", "0"])
+
+    assert result.exit_code == 0
+
+    assert len(SaveService.list_versions(RegistryService.load_game(GAME_ID))) == 4
+
+
+def test_the_command_reports_what_it_removed(registered_game, working_save):
+
+    ConfigurationService.set_retention(0)
+
+    play_sessions(registered_game, working_save, 6)
+
+    result = runner.invoke(app, ["config", "retention", "2"])
+
+    assert GAME_ID in result.output
+    assert "locally" in result.output
+    assert "storage" in result.output
+
+
+def test_the_setting_survives_unreachable_storage(
+    registered_game,
+    working_save,
+    monkeypatch,
+):
+    """
+    A backend that cannot be reached must not lose the setting.
+    """
+
+    ConfigurationService.set_retention(0)
+
+    play_sessions(registered_game, working_save, 5)
+
+    def unavailable(cls) -> bool:
+        return False
+
+    monkeypatch.setattr(
+        LocalStorageBackend,
+        "available",
+        classmethod(unavailable),
+    )
+
+    result = runner.invoke(app, ["config", "retention", "2"])
+
+    assert result.exit_code == 0
+
+    assert ConfigurationService.load().version_retention == 2
+
+    #
+    # The library is local, so it is trimmed regardless.
+    #
+
+    assert len(SaveService.list_versions(RegistryService.load_game(GAME_ID))) == 2
+
+    assert "next upload" in result.output
+
+
+def test_apply_retention_reports_per_game(registered_game, working_save):
+
+    ConfigurationService.set_retention(0)
+
+    play_sessions(registered_game, working_save, 5)
+
+    removed = SaveService.apply_retention(2)
+
+    assert removed[GAME_ID] == [1, 2, 3]
+
+
+def test_apply_retention_omits_games_with_nothing_to_remove(
+    registered_game,
+    working_save,
+):
+
+    play_sessions(registered_game, working_save, 3)
+
+    assert SaveService.apply_retention(2) == {}
+
+
+def test_prune_remote_omits_games_with_nothing_to_remove(
+    registered_game,
+    working_save,
+):
+
+    play_sessions(registered_game, working_save, 3)
+
+    assert SyncService.prune_remote(2) == {}

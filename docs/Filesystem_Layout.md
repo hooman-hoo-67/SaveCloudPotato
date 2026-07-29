@@ -133,6 +133,10 @@ defaults to the two most recent. Nothing SaveCloud overwrites is
 unrecoverable within that window; set the retention to zero to keep
 every version instead.
 
+Versions are trimmed as they are created, and again whenever the
+window is set, since a game whose save has not changed would otherwise
+keep history the window no longer allows.
+
 ---
 
 # metadata.json

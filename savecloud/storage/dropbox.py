@@ -925,12 +925,58 @@ class DropboxStorageBackend(BaseStorageBackend):
         # the window rather than being one over it.
         #
 
-        if keep <= 0:
-            return
+        cls._trim_versions(client, game_id, keep, existing)
 
-        for name in sorted(existing, reverse=True)[keep:]:
+    @classmethod
+    def prune(
+        cls,
+        game_id: str,
+        keep: int,
+    ) -> list[str]:
+        """
+        Delete versions in Dropbox beyond the newest ``keep``.
+        """
+
+        if keep <= 0:
+            return []
+
+        client = cls.client()
+
+        existing = {
+            entry["name"]
+            for entry in client.list_folder(cls.versions_path(game_id))
+            if entry.get(".tag") == "folder"
+        }
+
+        return cls._trim_versions(client, game_id, keep, existing)
+
+    @classmethod
+    def _trim_versions(
+        cls,
+        client: DropboxClient,
+        game_id: str,
+        keep: int,
+        existing: set[str],
+    ) -> list[str]:
+        """
+        Delete all but the newest ``keep`` of ``existing``.
+
+        Takes the listing as an argument so a push, which has just
+        enumerated the folder, does not pay for a second listing.
+        """
+
+        if keep <= 0:
+            return []
+
+        remote_versions = cls.versions_path(game_id)
+
+        doomed = sorted(existing, reverse=True)[keep:]
+
+        for name in doomed:
 
             client.delete(f"{remote_versions}/{name}")
+
+        return sorted(doomed)
 
     @classmethod
     def _pull_versions(

@@ -661,3 +661,52 @@ would never agree.
 Status
 
 Accepted
+
+---
+
+## Setting the retention window applies it
+
+Date: 2026-07-29
+
+Context
+
+Trimming at version creation means retention is enforced as history
+grows. It is never enforced on history that already exists.
+
+The first report of this was someone lowering the window and then
+synchronizing a game they had not played since. Sync found nothing to
+do, so no version was created, so nothing was trimmed, and seven
+versions stayed where the window said two. Nothing was broken - the
+backlog would have cleared on the next real save - but a setting that
+takes effect at an unpredictable future moment reads as one that does
+not work.
+
+Decision
+
+`config retention` applies the window when it is set: across every
+registered game, in the library and in storage, reporting what it
+removed.
+
+Backends gained a public `prune(game_id, keep)` for the storage half.
+It is abstract rather than defaulting to a no-op, because a backend
+that silently ignored retention would grow without bound and nothing
+would say so.
+
+Consequences
+
+Retention now has two enforcement points rather than one - at creation
+and at configuration - which is the cost of a policy that applies to
+data already at rest. They share `SaveCloudLibrary.prune_versions`, so
+the rule itself is still written once.
+
+Applying the window deletes data, so the command reports per game what
+it removed rather than only confirming the setting.
+
+Unreachable storage does not fail the command. The setting is local
+and the library is local; refusing to record either because a cloud
+provider is offline would be the wrong trade. Storage is trimmed on
+the next upload, and the command says so.
+
+Status
+
+Accepted

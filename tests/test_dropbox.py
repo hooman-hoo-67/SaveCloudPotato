@@ -820,3 +820,67 @@ def test_progress_is_silent_without_a_reporter(dropbox, registered_game):
     assert progress.reporter() is None
 
     SyncService.sync(registered_game)
+
+
+def test_prune_trims_dropbox_without_a_push(
+    dropbox,
+    registered_game,
+    working_save,
+):
+    """
+    A window lowered while the save stayed still must still reach
+    Dropbox, which a push-time trim alone would never do.
+    """
+
+    ConfigurationService.set_retention(0)
+
+    for index in range(5):
+
+        write_save(working_save, f"session {index}")
+
+        SyncService.sync(RegistryService.load_game(GAME_ID))
+
+    def stored() -> set[str]:
+        return {
+            path.split("/versions/")[1].split("/")[0]
+            for path in dropbox.files
+            if f"/games/{GAME_ID}/versions/" in path
+        }
+
+    assert len(stored()) == 5
+
+    removed = DropboxStorageBackend.prune(GAME_ID, 2)
+
+    assert sorted(removed) == ["000001", "000002", "000003"]
+
+    assert stored() == {"000004", "000005"}
+
+
+def test_prune_keeps_everything_when_unlimited(
+    dropbox,
+    registered_game,
+    working_save,
+):
+
+    ConfigurationService.set_retention(0)
+
+    for index in range(3):
+
+        write_save(working_save, f"session {index}")
+
+        SyncService.sync(RegistryService.load_game(GAME_ID))
+
+    assert DropboxStorageBackend.prune(GAME_ID, 0) == []
+
+    versions = {
+        path.split("/versions/")[1].split("/")[0]
+        for path in dropbox.files
+        if f"/games/{GAME_ID}/versions/" in path
+    }
+
+    assert len(versions) == 3
+
+
+def test_prune_is_harmless_for_an_unknown_game(dropbox):
+
+    assert DropboxStorageBackend.prune("never-registered", 2) == []

@@ -50,12 +50,28 @@ savecloud config retention 0      # keep every version
 ```
 
 Counts history only, so `2` leaves three saves in total: the current
-one plus two previous. Older versions are deleted the next time a save
-is captured, in the library and in storage alike.
+one plus two previous.
+
+Setting the window applies it immediately, in the library and in
+storage:
+
+```
+✓ Keeping 2 versions per game.
+  test_zelda: removed 5 versions locally
+  test_zelda: removed 5 versions from storage
+```
+
+Versions are otherwise trimmed as they are created, which never reaches
+a game whose save has not changed. Without applying it here, lowering
+the window would appear to do nothing until the next play session.
 
 Storage is trimmed as well as the library. If only one side pruned, a
 device still holding older history would keep re-uploading what the
 other had just removed.
+
+Unreachable storage is reported, not fatal. The setting is saved and
+the library is trimmed regardless; storage catches up on the next
+upload.
 
 ### `savecloud config provider [NAME]`
 
