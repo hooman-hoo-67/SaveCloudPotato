@@ -14,7 +14,12 @@ from savecloud.services.sync import (
     SyncConflictError,
     SyncService,
 )
-from savecloud.utils.output import report_conflict, resolution_from_flags
+from savecloud.utils.output import (
+    clear_progress,
+    report_conflict,
+    resolution_from_flags,
+    show_progress,
+)
 
 
 def sync(
@@ -58,25 +63,38 @@ def sync(
 
     game = RegistryService.load_game(game_id)
 
+    show_progress()
+
     try:
         if check:
-            typer.echo(f"{game_id}: {SyncService.status(game).value}")
+            action = SyncService.status(game)
+
+            clear_progress()
+
+            typer.echo(f"{game_id}: {action.value}")
+
             return
 
         action = SyncService.sync(game, resolution)
 
     except SyncConflictError as error:
+        clear_progress()
+
         report_conflict(error)
 
         raise typer.Exit(code=1)
 
     except StorageUnavailableError as error:
+        clear_progress()
+
         typer.secho(
             f"✗ {error}",
             fg=typer.colors.RED,
         )
 
         raise typer.Exit(code=1)
+
+    clear_progress()
 
     messages = {
         SyncAction.UPLOAD: "✓ Uploaded local save.",
@@ -120,7 +138,11 @@ def sync_all(
 
         return
 
+    show_progress()
+
     results = SyncService.sync_all(resolution)
+
+    clear_progress()
 
     if not results:
         typer.echo("No games have synchronization enabled.")

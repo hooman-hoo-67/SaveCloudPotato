@@ -8,6 +8,8 @@ may call services, but it never implements a workflow.
 
 from __future__ import annotations
 
+import sys
+
 import typer
 
 from savecloud.models.device_profile import DeviceProfile
@@ -16,6 +18,7 @@ from savecloud.services.device import DeviceService
 from savecloud.services.library import SaveCloudLibrary
 from savecloud.services.registry import RegistryService
 from savecloud.services.sync import ConflictResolution, SyncConflictError
+from savecloud.utils import progress
 
 
 def require_game(game_id: str) -> Game:
@@ -106,3 +109,48 @@ def report_conflict(
     typer.echo(f"  savecloud sync {error.game_id} --keep-remote")
     typer.echo()
     typer.echo("Whichever save loses is kept in this game's version history.")
+
+
+def show_progress(quiet: bool = False) -> None:
+    """
+    Display progress from long-running backend operations.
+
+    A cloud backend spends a network round trip per file, so an
+    otherwise silent minute looks exactly like a hang. On a terminal
+    the line is rewritten in place; when redirected, nothing is printed
+    rather than filling a log with partial lines.
+    """
+
+    if quiet or not sys.stderr.isatty():
+        progress.set_reporter(None)
+        return
+
+    state = {"width": 0}
+
+    def render(message: str) -> None:
+
+        #
+        # Truncate rather than wrap, so a long path does not turn one
+        # line of progress into several.
+        #
+
+        text = message[:78]
+
+        sys.stderr.write("\r" + text.ljust(state["width"]))
+        sys.stderr.flush()
+
+        state["width"] = max(state["width"], len(text))
+
+    progress.set_reporter(render)
+
+
+def clear_progress() -> None:
+    """
+    Remove the progress line before printing a result.
+    """
+
+    if progress.reporter() is not None and sys.stderr.isatty():
+        sys.stderr.write("\r" + " " * 79 + "\r")
+        sys.stderr.flush()
+
+    progress.set_reporter(None)

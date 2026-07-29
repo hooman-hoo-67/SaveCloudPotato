@@ -7,7 +7,7 @@ from __future__ import annotations
 import typer
 
 from savecloud.services.sync import StorageUnavailableError, SyncService
-from savecloud.utils.output import require_game
+from savecloud.utils.output import clear_progress, require_game, show_progress
 
 
 def upload(
@@ -19,13 +19,19 @@ def upload(
 
     game = require_game(game_id)
 
+    show_progress()
+
     try:
         SyncService.upload(game)
 
     except StorageUnavailableError as error:
+        clear_progress()
+
         typer.secho(f"✗ {error}", fg=typer.colors.RED)
 
         raise typer.Exit(code=1)
+
+    clear_progress()
 
     typer.secho(
         "✓ Save uploaded successfully.",

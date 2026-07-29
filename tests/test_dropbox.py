@@ -753,3 +753,70 @@ def test_playing_on_both_devices_conflicts_through_dropbox(monkeypatch, tmp_path
     #
 
     assert read_save(deck_save) == "deck ending"
+
+
+#
+# Progress reporting
+#
+
+
+def test_uploads_report_progress(dropbox, registered_game, working_save):
+    """
+    A cloud sync is minutes of round trips; silence looks like a hang.
+    """
+
+    from savecloud.utils import progress
+
+    for index in range(5):
+        (working_save / f"slot{index}.sav").write_text("data", encoding="utf-8")
+
+    lines: list[str] = []
+
+    progress.set_reporter(lines.append)
+
+    try:
+        SyncService.sync(registered_game)
+
+    finally:
+        progress.set_reporter(None)
+
+    assert any("Uploading current save" in line for line in lines)
+    assert any("(1/6)" in line for line in lines)
+    assert any("(6/6)" in line for line in lines)
+
+
+def test_downloads_report_progress(dropbox, registered_game, working_save):
+
+    import shutil
+
+    from savecloud.utils import progress
+
+    (working_save / "extra.sav").write_text("data", encoding="utf-8")
+
+    SyncService.sync(registered_game)
+
+    shutil.rmtree(SaveService.current_save(registered_game))
+
+    lines: list[str] = []
+
+    progress.set_reporter(lines.append)
+
+    try:
+        DropboxStorageBackend.download(GAME_ID)
+
+    finally:
+        progress.set_reporter(None)
+
+    assert any("Downloading" in line for line in lines)
+
+
+def test_progress_is_silent_without_a_reporter(dropbox, registered_game):
+    """
+    Services and tests must not have output forced on them.
+    """
+
+    from savecloud.utils import progress
+
+    assert progress.reporter() is None
+
+    SyncService.sync(registered_game)

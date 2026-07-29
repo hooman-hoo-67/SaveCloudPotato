@@ -37,6 +37,7 @@ from savecloud.storage.base import BaseStorageBackend
 from savecloud.utils import http
 from savecloud.utils.filesystem import remove_directory, replace_directory
 from savecloud.utils.hashing import hash_directory
+from savecloud.utils.progress import Progress, report
 
 PROVIDER = "dropbox"
 
@@ -572,6 +573,8 @@ class DropboxStorageBackend(BaseStorageBackend):
         # missing ones.
         #
 
+        report("Uploading current save")
+
         cls._push_directory(client, source, cls.current_path(game_id))
 
         cls._prune(client, source, cls.current_path(game_id))
@@ -757,17 +760,27 @@ class DropboxStorageBackend(BaseStorageBackend):
         client: DropboxClient,
         source: Path,
         remote_path: str,
+        label: str = "Uploading",
     ) -> None:
         """
         Upload every file beneath a local directory.
+
+        Each file costs a round trip, so progress is reported per file
+        rather than leaving the caller staring at nothing.
         """
 
-        for relative in cls._relative_files(source):
+        files = cls._relative_files(source)
+
+        progress = Progress(label, len(files))
+
+        for relative in files:
 
             client.upload(
                 f"{remote_path}/{relative.as_posix()}",
                 (source / relative).read_bytes(),
             )
+
+            progress.step(relative.as_posix())
 
     @classmethod
     def _pull_directory(
@@ -783,6 +796,8 @@ class DropboxStorageBackend(BaseStorageBackend):
         destination.mkdir(parents=True, exist_ok=True)
 
         prefix = remote_path.lower() + "/"
+
+        wanted: list[tuple[str, Path]] = []
 
         for entry in client.list_folder(remote_path, recursive=True):
 
@@ -807,11 +822,17 @@ class DropboxStorageBackend(BaseStorageBackend):
             if not relative:
                 continue
 
-            target = destination / relative
+            wanted.append((full, destination / relative))
+
+        progress = Progress("Downloading", len(wanted))
+
+        for full, target in wanted:
 
             target.parent.mkdir(parents=True, exist_ok=True)
 
             target.write_bytes(client.download(full))
+
+            progress.step(target.name)
 
     @classmethod
     def _prune(
@@ -879,6 +900,7 @@ class DropboxStorageBackend(BaseStorageBackend):
                 client,
                 directory,
                 f"{remote_versions}/{directory.name}",
+                label=f"Uploading version {directory.name}",
             )
 
     @classmethod
