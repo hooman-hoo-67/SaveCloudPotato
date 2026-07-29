@@ -92,9 +92,18 @@ class DropboxClient:
     # Authentication
     # ------------------------------------------------------------------
 
-    def access_token(self) -> str:
+    def access_token(
+        self,
+        timeout: int = http.DEFAULT_TIMEOUT,
+    ) -> str:
         """
         Return a usable access token, refreshing it if necessary.
+
+        Parameters
+        ----------
+        timeout
+            Seconds to wait. A reachability probe passes a short one,
+            since it is only asking whether Dropbox answers at all.
         """
 
         if self._access_token and time.time() < self._expires_at:
@@ -108,6 +117,7 @@ class DropboxClient:
                 "client_id": self.app_key,
                 "client_secret": self.app_secret,
             },
+            timeout=timeout,
         )
 
         token = response.get("access_token")
@@ -315,6 +325,13 @@ class DropboxStorageBackend(BaseStorageBackend):
 
     _client: DropboxClient | None = None
 
+    #
+    # Why the last reachability probe failed, so the explanation
+    # costs no second round trip.
+    #
+
+    _probe_failure: Exception | None = None
+
     @staticmethod
     def display_name() -> str:
         """
@@ -388,6 +405,8 @@ class DropboxStorageBackend(BaseStorageBackend):
 
         cls._client = None
 
+        cls._probe_failure = None
+
     # ------------------------------------------------------------------
     # Remote layout
     # ------------------------------------------------------------------
@@ -416,13 +435,22 @@ class DropboxStorageBackend(BaseStorageBackend):
     def available(cls) -> bool:
         """
         Return True if Dropbox can be reached with stored credentials.
+
+        Probed with a short timeout and the failure remembered, because
+        the caller that gets False almost always asks why immediately
+        afterwards. Probing twice would double the wait in front of
+        someone whose network is down.
         """
 
         try:
-            cls.client().access_token()
+            cls.client().access_token(timeout=http.PROBE_TIMEOUT)
 
-        except Exception:
+        except Exception as error:
+            cls._probe_failure = error
+
             return False
+
+        cls._probe_failure = None
 
         return True
 
@@ -439,7 +467,10 @@ class DropboxStorageBackend(BaseStorageBackend):
             )
 
         try:
-            cls.client().access_token()
+            if cls._probe_failure is not None:
+                raise cls._probe_failure
+
+            cls.client().access_token(timeout=http.PROBE_TIMEOUT)
 
         except DropboxError as error:
             return str(error)

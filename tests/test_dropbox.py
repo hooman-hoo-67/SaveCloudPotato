@@ -884,3 +884,68 @@ def test_prune_keeps_everything_when_unlimited(
 def test_prune_is_harmless_for_an_unknown_game(dropbox):
 
     assert DropboxStorageBackend.prune("never-registered", 2) == []
+
+
+def test_a_reachability_probe_is_not_paid_twice(dropbox, monkeypatch):
+    """
+    A launch on a dead network waits for this probe, and the caller
+    that gets False asks why immediately afterwards. Probing again
+    would double the wait in front of someone trying to play.
+    """
+
+    attempts = []
+
+    def unreachable(url, fields, timeout=30):
+        attempts.append(timeout)
+
+        raise http.HttpError(0, "network is unreachable", url)
+
+    monkeypatch.setattr(http, "post_form", unreachable)
+
+    DropboxStorageBackend.reset()
+
+    assert DropboxStorageBackend.available() is False
+
+    reason = DropboxStorageBackend.unavailable_reason()
+
+    assert "could not be reached" in reason
+
+    assert len(attempts) == 1
+
+
+def test_the_probe_uses_a_short_timeout(dropbox, monkeypatch):
+    """
+    Availability is a yes/no question, not a transfer.
+    """
+
+    seen = []
+
+    def unreachable(url, fields, timeout=30):
+        seen.append(timeout)
+
+        raise http.HttpError(0, "network is unreachable", url)
+
+    monkeypatch.setattr(http, "post_form", unreachable)
+
+    DropboxStorageBackend.reset()
+
+    DropboxStorageBackend.available()
+
+    assert seen == [http.PROBE_TIMEOUT]
+
+    assert http.PROBE_TIMEOUT < http.DEFAULT_TIMEOUT
+
+
+def test_a_recovered_network_clears_the_remembered_failure(
+    dropbox,
+    registered_game,
+):
+    """
+    A cached failure must not outlive the condition that caused it.
+    """
+
+    DropboxStorageBackend._probe_failure = RuntimeError("stale")
+
+    assert DropboxStorageBackend.available() is True
+
+    assert DropboxStorageBackend._probe_failure is None

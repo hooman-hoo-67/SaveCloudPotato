@@ -15,6 +15,16 @@ import urllib.request
 
 DEFAULT_TIMEOUT = 30
 
+#
+# Asking whether a provider is reachable is a different question from
+# transferring a save, and deserves a different patience. A launch
+# waits on the answer, so the wait has to be short enough that someone
+# on a dead network reaches their game rather than concluding it is
+# broken.
+#
+
+PROBE_TIMEOUT = 5
+
 
 class HttpError(RuntimeError):
     """
