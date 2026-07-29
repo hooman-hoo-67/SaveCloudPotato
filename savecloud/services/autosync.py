@@ -48,6 +48,33 @@ from savecloud.services.sync import (
 SHUTDOWN_SIGNALS = (signal.SIGTERM, signal.SIGINT)
 
 
+def auto_sync_enabled(game: Game) -> bool:
+    """
+    Return whether this device synchronizes this game automatically.
+
+    Two switches, deliberately. `sync_enabled` on the manifest travels
+    with the game and means "this game is managed at all". `enabled` on
+    the device profile stays here and means "this device takes part" -
+    which is what lets a laptop on a metered connection stop uploading
+    without changing anything for the desktop it shares saves with.
+
+    A device with no profile for the game has nothing to say about it,
+    so the manifest decides alone.
+    """
+
+    if not game.manifest.sync_enabled:
+        return False
+
+    device_id = SaveCloudLibrary.device_id()
+
+    game_id = game.manifest.game_id
+
+    if not DeviceService.exists(device_id, game_id):
+        return True
+
+    return DeviceService.load_profile(device_id, game_id).enabled
+
+
 def _is_ordinary_exit(exit_code: int) -> bool:
     """
     Return whether an exit code describes a normal end to a session.
@@ -313,7 +340,7 @@ class AutoSyncService:
         is the one exception, and propagates.
         """
 
-        if not game.manifest.sync_enabled:
+        if not auto_sync_enabled(game):
             return
 
         try:
@@ -351,7 +378,7 @@ class AutoSyncService:
 
         RegistryService.update_runtime(game)
 
-        if not game.manifest.sync_enabled:
+        if not auto_sync_enabled(game):
             return
 
         #

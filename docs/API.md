@@ -151,6 +151,28 @@ List registered games.
 ### `savecloud info GAME_ID`
 
 Show a game's configuration, runtime state, and this device's profile.
+A game that is registered but not set up here says so and names the
+command that adopts it.
+
+### `savecloud autosync GAME_ID [on|off]`
+
+Show or change whether **this device** synchronizes a game
+automatically.
+
+```
+savecloud autosync pokemon-scarlet          # show
+savecloud autosync pokemon-scarlet off      # this device stops
+```
+
+Off means `play`, `wrap`, and a bare `savecloud sync` skip the game on
+this machine. Naming it explicitly still works, since the switch
+governs automatic behaviour rather than permission.
+
+The setting lives in the device profile, so it is never synchronized:
+turning it off on a laptop changes nothing for the desktop it shares
+saves with. `sync_enabled` on the manifest is the other switch - it
+travels with the game and means "managed at all", so a game disabled
+there is disabled everywhere.
 
 ---
 

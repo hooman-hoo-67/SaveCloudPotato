@@ -454,11 +454,19 @@ class SyncService:
         recorded against that game and reporting continues.
         """
 
+        from savecloud.services.autosync import auto_sync_enabled
+
         results: dict[str, SyncAction | str] = {}
 
         for game in RegistryService.list_games():
 
-            if not game.manifest.sync_enabled:
+            #
+            # Syncing everything is an automatic action, so a game this
+            # device has opted out of is skipped. Naming the game
+            # explicitly still synchronizes it.
+            #
+
+            if not auto_sync_enabled(game):
                 continue
 
             try:

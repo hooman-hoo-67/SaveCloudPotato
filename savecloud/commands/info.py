@@ -25,9 +25,18 @@ def info(game_id: str) -> None:
 
     game = RegistryService.load_game(game_id)
 
-    profile = DeviceService.load_profile(
-        SaveCloudLibrary.device_id(),
-        game_id,
+    #
+    # A game can be registered and synchronized without being set up
+    # here - that is exactly the state `pair` resolves - so a missing
+    # profile is reported rather than raised.
+    #
+
+    device_id = SaveCloudLibrary.device_id()
+
+    profile = (
+        DeviceService.load_profile(device_id, game_id)
+        if DeviceService.exists(device_id, game_id)
+        else None
     )
 
     if output.json_mode():
@@ -71,7 +80,7 @@ def info(game_id: str) -> None:
                     "working_save_path": str(profile.working_save_path),
                     "launch_command": profile.launch_command,
                     "launcher": profile.launcher,
-                    "enabled": profile.enabled,
+                    "auto_sync": profile.enabled,
                 },
             }
         )
@@ -140,9 +149,21 @@ def info(game_id: str) -> None:
 
     typer.echo()
 
+    if profile is None:
+        typer.secho(
+            "This game is not set up on this device.",
+            fg=typer.colors.YELLOW,
+        )
+
+        typer.echo(f"Adopt it here with:  savecloud pair {game_id}")
+
+        return
+
     typer.echo(f"Device          : {profile.device_name}")
 
     typer.echo(f"Working Save    : {profile.working_save_path}")
 
     typer.echo(f"Launch Command  : {profile.launch_command}")
     typer.echo(f"Launcher        : {profile.launcher}")
+
+    typer.echo(f"Automatic Sync  : {'on' if profile.enabled else 'off'}")

@@ -664,6 +664,57 @@ Accepted
 
 ---
 
+## Automatic sync is a per-device switch
+
+Date: 2026-07-29
+
+Context
+
+`sync_enabled` on the manifest was the only way to stop a game
+synchronizing, and the manifest is synchronized. Turning it off
+anywhere turned it off everywhere.
+
+That is the wrong shape for the case that prompted it: a device on a
+metered or unreliable connection wanting to stop uploading, without
+changing anything for the machine it shares saves with.
+
+`DeviceProfile.enabled` already existed, already documented as
+"whether SaveCloud is enabled for this game on this device", and was
+read, displayed, and never checked by anything.
+
+Decision
+
+Make it real rather than adding a second field beside it.
+
+`sync_enabled` on the manifest keeps its meaning: this game is managed
+at all, everywhere. `enabled` on the profile means this device takes
+part. Both must be on for automatic synchronization to happen.
+
+Consequences
+
+The switch governs automatic behaviour only - `play`, `wrap`, and a
+bare `savecloud sync`. Naming a game explicitly still synchronizes it,
+because the setting expresses a preference about background work
+rather than permission to touch the save.
+
+A device with no profile for a game follows the manifest alone. It has
+nothing to say about a game it has never been set up for.
+
+`savecloud autosync GAME_ID [on|off]` exposes it, and `info` and
+`list` report it. Two concepts is one more than before, so both places
+that show it say which is which.
+
+Finding while implementing: `info` called `load_profile` unguarded, so
+a game registered but not yet paired on this device raised
+FileNotFoundError out of the service layer instead of explaining
+itself. It now reports the state and names `pair`.
+
+Status
+
+Accepted
+
+---
+
 ## A --json flag, not a second set of commands
 
 Date: 2026-07-29

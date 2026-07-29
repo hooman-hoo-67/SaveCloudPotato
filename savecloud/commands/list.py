@@ -4,6 +4,7 @@ List all registered games.
 
 import typer
 
+from savecloud.services.autosync import auto_sync_enabled
 from savecloud.services.registry import RegistryService
 from savecloud.utils import output
 
@@ -27,6 +28,7 @@ def list() -> None:
                         "platform": game.manifest.platform.value,
                         "adapter": game.manifest.adapter,
                         "sync_enabled": game.manifest.sync_enabled,
+                        "auto_sync": auto_sync_enabled(game),
                         "status": game.runtime.status.value,
                         "pending_upload": game.runtime.pending_upload,
                     }

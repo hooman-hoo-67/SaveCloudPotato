@@ -8,6 +8,7 @@ nothing here contains business logic.
 import typer
 
 from savecloud.commands import (
+    autosync,
     config,
     doctor,
     download,
@@ -70,6 +71,7 @@ app.command("register")(register.register)
 app.command("unregister")(unregister.unregister)
 app.command("list")(list_command.list)
 app.command("info")(info.info)
+app.command("autosync")(autosync.autosync)
 
 #
 # Save management

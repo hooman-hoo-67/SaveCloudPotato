@@ -149,6 +149,12 @@ Windows     C:\Users\User\AppData\...
 All three manage the same game. Synchronizing these paths would
 overwrite valid local configuration with another machine's.
 
+`enabled` is this device's automatic-sync switch. `play`, `wrap`, and
+a bare `savecloud sync` skip a game it is off for; naming the game
+explicitly still synchronizes it. Because the profile never travels,
+one device can stop uploading without changing anything for the others
+- which `GameManifest.sync_enabled`, being synchronized, cannot do.
+
 ---
 
 ## InstallationConfig
