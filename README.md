@@ -158,6 +158,19 @@ Nothing has been overwritten. Resolve it with one of:
 Whichever save loses is kept in version history, so the choice is
 reversible.
 
+## Version history
+
+Every sync that finds a change creates a version. By default the two
+most recent are kept, plus the current save:
+
+```bash
+savecloud config retention 2      # default
+savecloud config retention 0      # keep everything
+```
+
+Without a limit the history grows forever, and on a cloud backend every
+version is uploaded.
+
 ## Commands
 
 | Command | Purpose |

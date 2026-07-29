@@ -615,3 +615,49 @@ Status
 
 Accepted. Revisit if a provider ever needs genuinely nested remote
 paths.
+
+---
+
+### Version history is bounded by default
+
+Decision
+
+`InstallationConfig.version_retention` caps how many historical
+versions each game keeps, defaulting to the two most recent. Zero keeps
+everything. The limit is applied in the library and in storage alike.
+
+Reason
+
+Every synchronization that finds a change creates a version, and
+`play` synchronizes twice per session. History therefore grew without
+limit - and once a cloud backend was in use, every one of those
+versions was uploaded, costing a network round trip per file.
+
+Two is enough for what history is actually used for: undoing a bad
+session, and the one before it.
+
+This narrows an earlier principle. "Nothing SaveCloud overwrites is
+unrecoverable" now holds within the retention window rather than
+forever. That is a real trade, which is why it is configurable and why
+zero remains available.
+
+Consequences found while implementing
+
+Pruning must happen in `create_version_from`, the single point where
+versions are created. Doing it at call sites would eventually mean a
+path that creates a version and forgets to trim.
+
+`restore_version` had to be reordered. It preserved the current save
+first, which creates a version, which prunes - and the version being
+restored is among the oldest, so it could be deleted moments before
+being read. The version is now copied aside before anything else
+happens.
+
+Storage must be trimmed too, and after uploading rather than before.
+Trimming only locally would leave a device that still holds older
+history re-uploading what another device had just pruned, and the two
+would never agree.
+
+Status
+
+Accepted

@@ -135,6 +135,27 @@ class ConfigurationService:
         return config
 
     @staticmethod
+    def set_retention(
+        count: int,
+    ) -> InstallationConfig:
+        """
+        Change how many historical versions are kept per game.
+
+        Zero keeps every version.
+        """
+
+        if count < 0:
+            raise ValueError("Version retention cannot be negative.")
+
+        config = ConfigurationService.load()
+
+        config.version_retention = count
+
+        ConfigurationService.save(config)
+
+        return config
+
+    @staticmethod
     def set_root(
         root,
     ) -> InstallationConfig:

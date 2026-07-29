@@ -40,6 +40,23 @@ Show or change the directory the storage backend uses.
 savecloud config root ~/Sync/SaveCloud
 ```
 
+### `savecloud config retention [N]`
+
+Show or change how many historical versions are kept per game.
+
+```
+savecloud config retention 2      # default
+savecloud config retention 0      # keep every version
+```
+
+Counts history only, so `2` leaves three saves in total: the current
+one plus two previous. Older versions are deleted the next time a save
+is captured, in the library and in storage alike.
+
+Storage is trimmed as well as the library. If only one side pruned, a
+device still holding older history would keep re-uploading what the
+other had just removed.
+
 ### `savecloud config provider [NAME]`
 
 Set up credentials for a storage backend. Defaults to the active one.

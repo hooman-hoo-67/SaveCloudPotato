@@ -391,7 +391,16 @@ def test_an_adopted_device_does_not_overwrite_inherited_history(desktop, deck):
     allocated those numbers.
     """
 
+    #
+    # Retention would trim the inherited history this test checks, so
+    # it is disabled: the invariant is that an inherited version is
+    # never overwritten, not how many survive.
+    #
+
+    from savecloud.services.configuration import ConfigurationService
+
     desktop.activate()
+    ConfigurationService.set_retention(0)
     desktop.sync()
 
     for chapter in ("chapter two", "chapter three"):
@@ -401,6 +410,8 @@ def test_an_adopted_device_does_not_overwrite_inherited_history(desktop, deck):
     pair_game(deck)
 
     deck.activate()
+
+    ConfigurationService.set_retention(0)
 
     inherited = {
         version: read_save(SaveCloudLibrary.version_directory(GAME_ID, version))

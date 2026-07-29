@@ -160,6 +160,7 @@ synchronized.
 |-------|------|---------|
 | `storage_backend` | `str` | `"local"` |
 | `storage_root` | `Path` | `~/SaveCloudRemote` |
+| `version_retention` | `int` | `2` |
 
 Before v0.4 every manifest carried its own backend:
 

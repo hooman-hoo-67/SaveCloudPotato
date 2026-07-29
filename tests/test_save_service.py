@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import pytest
 
+from savecloud.services.configuration import ConfigurationService
 from savecloud.services.device import DeviceService
 from savecloud.services.library import SaveCloudLibrary
 from savecloud.services.save import SaveService
@@ -142,6 +143,14 @@ def test_versions_pulled_from_storage_are_never_overwritten(
     its metadata having allocated those numbers. Allocating the next
     version from metadata alone would overwrite immutable history.
     """
+
+    #
+    # Retention would trim the history this test is about, so it is
+    # disabled here: the invariant under test is that an existing
+    # version is never overwritten, not how many are kept.
+    #
+
+    ConfigurationService.set_retention(0)
 
     SaveService.import_save(registered_game, profile)
 

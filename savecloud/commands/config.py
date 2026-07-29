@@ -44,6 +44,14 @@ def show() -> None:
 
     typer.echo(f"Storage Root    : {config.storage_root}")
 
+    if config.version_retention == 0:
+        typer.echo("Version History : every version kept")
+
+    else:
+        typer.echo(
+            f"Version History : {config.version_retention} versions per game"
+        )
+
     typer.echo()
 
     if backend is None:
@@ -151,6 +159,56 @@ def root(
     typer.secho(
         f"✓ Storage root set to {config.storage_root}.",
         fg=typer.colors.GREEN,
+    )
+
+
+@app.command("retention")
+def retention(
+    count: int = typer.Argument(
+        None,
+        help="Versions to keep per game. 0 keeps every version.",
+    ),
+) -> None:
+    """
+    Show or change how many historical versions are kept.
+    """
+
+    if count is None:
+        current = ConfigurationService.load().version_retention
+
+        if current == 0:
+            typer.echo("0 (every version is kept)")
+
+        else:
+            typer.echo(f"{current} versions per game, plus the current save")
+
+        return
+
+    try:
+        config = ConfigurationService.set_retention(count)
+
+    except ValueError as error:
+        typer.secho(str(error), fg=typer.colors.RED)
+
+        raise typer.Exit(code=1)
+
+    if config.version_retention == 0:
+        typer.secho(
+            "✓ Every version will be kept.",
+            fg=typer.colors.GREEN,
+        )
+
+        return
+
+    typer.secho(
+        f"✓ Keeping {config.version_retention} versions per game.",
+        fg=typer.colors.GREEN,
+    )
+
+    typer.echo()
+    typer.echo(
+        "Older versions are deleted the next time a save is captured, "
+        "locally and in storage."
     )
 
 

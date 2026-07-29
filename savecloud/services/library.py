@@ -352,6 +352,84 @@ class SaveCloudLibrary:
         )
 
     @staticmethod
+    def prune_versions(
+        game_id: str,
+        keep: int,
+    ) -> list[int]:
+        """
+        Delete all but the newest ``keep`` versions.
+
+        Returns the version numbers that were removed.
+
+        A retention of zero keeps everything, which is the escape hatch
+        for anyone who would rather spend the disk than lose history.
+        """
+
+        if keep <= 0:
+            return []
+
+        versions_directory = SaveCloudLibrary.versions_directory(game_id)
+
+        if not versions_directory.exists():
+            return []
+
+        existing: list[int] = []
+
+        for directory in versions_directory.iterdir():
+
+            if not directory.is_dir():
+                continue
+
+            try:
+                existing.append(int(directory.name))
+
+            except ValueError:
+                continue
+
+        #
+        # The current save is not a version, so `keep` counts history
+        # only: keep=2 leaves the two most recent snapshots.
+        #
+
+        doomed = sorted(existing, reverse=True)[keep:]
+
+        for version in doomed:
+            shutil.rmtree(
+                SaveCloudLibrary.version_directory(game_id, version),
+                ignore_errors=True,
+            )
+
+        return sorted(doomed)
+
+    @staticmethod
+    def retained_versions(
+        game_id: str,
+        keep: int,
+    ) -> set[str]:
+        """
+        Return the version directory names retention would keep.
+
+        Named rather than numbered, because storage backends compare
+        against remote directory names.
+        """
+
+        versions_directory = SaveCloudLibrary.versions_directory(game_id)
+
+        names: list[str] = []
+
+        if versions_directory.exists():
+            names = [
+                directory.name
+                for directory in versions_directory.iterdir()
+                if directory.is_dir()
+            ]
+
+        if keep <= 0:
+            return set(names)
+
+        return set(sorted(names, reverse=True)[:keep])
+
+    @staticmethod
     def reconcile_versions(
         game_id: str,
     ) -> int:

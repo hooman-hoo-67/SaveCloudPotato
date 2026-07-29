@@ -126,7 +126,12 @@ devices disagree about the time.
 
 A version is created whenever a changed save is captured, whenever a
 restore replaces the current save, and whenever a conflict resolution
-discards one side. Nothing SaveCloud overwrites is unrecoverable.
+discards one side.
+
+History is bounded by `version_retention` in `config.json`, which
+defaults to the two most recent. Nothing SaveCloud overwrites is
+unrecoverable within that window; set the retention to zero to keep
+every version instead.
 
 ---
 

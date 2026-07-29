@@ -878,10 +878,14 @@ class DropboxStorageBackend(BaseStorageBackend):
         Upload versions Dropbox does not already hold.
         """
 
-        local_versions = layout.versions_directory(game_id)
+        from savecloud.services.configuration import ConfigurationService
+        from savecloud.services.library import SaveCloudLibrary
 
-        if not local_versions.exists():
-            return
+        keep = ConfigurationService.load().version_retention
+
+        retained = SaveCloudLibrary.retained_versions(game_id, keep)
+
+        local_versions = layout.versions_directory(game_id)
 
         remote_versions = cls.versions_path(game_id)
 
@@ -891,17 +895,42 @@ class DropboxStorageBackend(BaseStorageBackend):
             if entry.get(".tag") == "folder"
         }
 
-        for directory in sorted(local_versions.iterdir()):
+        if local_versions.exists():
 
-            if not directory.is_dir() or directory.name in existing:
-                continue
+            for directory in sorted(local_versions.iterdir()):
 
-            cls._push_directory(
-                client,
-                directory,
-                f"{remote_versions}/{directory.name}",
-                label=f"Uploading version {directory.name}",
-            )
+                if not directory.is_dir() or directory.name in existing:
+                    continue
+
+                #
+                # Only versions inside the retention window are pushed,
+                # so a device still holding older history does not keep
+                # restoring what another device pruned.
+                #
+
+                if directory.name not in retained:
+                    continue
+
+                cls._push_directory(
+                    client,
+                    directory,
+                    f"{remote_versions}/{directory.name}",
+                    label=f"Uploading version {directory.name}",
+                )
+
+                existing.add(directory.name)
+
+        #
+        # Trim afterwards, so a version uploaded just now counts towards
+        # the window rather than being one over it.
+        #
+
+        if keep <= 0:
+            return
+
+        for name in sorted(existing, reverse=True)[keep:]:
+
+            client.delete(f"{remote_versions}/{name}")
 
     @classmethod
     def _pull_versions(

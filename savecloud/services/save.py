@@ -14,6 +14,7 @@ from pathlib import Path
 from savecloud.services.library import SaveCloudLibrary
 from savecloud.models.game import Game
 from savecloud.models.device_profile import DeviceProfile
+from savecloud.utils.filesystem import remove_directory, replace_directory
 from savecloud.utils.hashing import hash_directory
 
 
@@ -181,6 +182,20 @@ class SaveService:
             metadata,
         )
 
+        #
+        # Every synchronization that finds a change creates a version,
+        # so history is trimmed at the point it grows. Pruning here
+        # rather than at each call site means no path can create a
+        # version and forget to.
+        #
+
+        from savecloud.services.configuration import ConfigurationService
+
+        SaveCloudLibrary.prune_versions(
+            game.manifest.game_id,
+            ConfigurationService.load().version_retention,
+        )
+
         return next_version
 
     @staticmethod
@@ -211,19 +226,28 @@ class SaveService:
         )
 
         #
-        # Preserve what is about to be overwritten.
+        # Take a copy of the version first. Preserving the current save
+        # creates a version, which prunes - and retention could
+        # otherwise delete the very version being restored, since it is
+        # among the oldest.
         #
 
-        if destination.exists():
-            SaveService.create_version(game)
+        staging = destination.parent / ".restoring"
 
-        if destination.exists():
-            shutil.rmtree(destination)
+        replace_directory(source, staging)
 
-        shutil.copytree(
-            source,
-            destination,
-        )
+        try:
+            #
+            # Preserve what is about to be overwritten.
+            #
+
+            if destination.exists():
+                SaveService.create_version(game)
+
+            replace_directory(staging, destination)
+
+        finally:
+            remove_directory(staging)
 
         metadata = SaveCloudLibrary.load_library_metadata(
             game.manifest.game_id,

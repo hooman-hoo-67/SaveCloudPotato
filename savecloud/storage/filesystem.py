@@ -439,13 +439,54 @@ class FilesystemStorageBackend(BaseStorageBackend):
         game_id: str,
     ) -> None:
         """
-        Copy local versions that the backend does not already hold.
+        Copy local versions that the backend does not already hold,
+        then discard remote versions beyond the retention window.
         """
+
+        from savecloud.services.configuration import ConfigurationService
+        from savecloud.services.library import SaveCloudLibrary
+
+        keep = ConfigurationService.load().version_retention
+
+        retained = SaveCloudLibrary.retained_versions(game_id, keep)
 
         cls._sync_versions(
             layout.versions_directory(game_id),
             cls.versions_directory(game_id),
+            only=retained,
         )
+
+        cls._prune_versions(game_id, keep)
+
+    @classmethod
+    def _prune_versions(
+        cls,
+        game_id: str,
+        keep: int,
+    ) -> None:
+        """
+        Delete remote versions beyond the newest ``keep``.
+
+        Applied remotely as well as locally, otherwise a device that
+        still holds an old version would keep re-uploading it and the
+        two would never agree.
+        """
+
+        if keep <= 0:
+            return
+
+        remote = cls.versions_directory(game_id)
+
+        if not remote.exists():
+            return
+
+        names = sorted(
+            (directory.name for directory in remote.iterdir() if directory.is_dir()),
+            reverse=True,
+        )
+
+        for name in names[keep:]:
+            remove_directory(remote / name)
 
     @classmethod
     def _pull_versions(
@@ -465,12 +506,14 @@ class FilesystemStorageBackend(BaseStorageBackend):
     def _sync_versions(
         source: Path,
         destination: Path,
+        only: set[str] | None = None,
     ) -> None:
         """
         Copy version directories that are missing from the destination.
 
         Versions are immutable, so an existing directory is never
-        overwritten.
+        overwritten. ``only`` restricts the copy to a named set, which
+        is how retention stops old versions being re-uploaded.
         """
 
         if not source.exists():
@@ -484,6 +527,9 @@ class FilesystemStorageBackend(BaseStorageBackend):
         for directory in sorted(source.iterdir()):
 
             if not directory.is_dir():
+                continue
+
+            if only is not None and directory.name not in only:
                 continue
 
             target = destination / directory.name

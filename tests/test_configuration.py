@@ -129,3 +129,62 @@ def test_registry_rejects_an_unregistered_backend():
 
     with pytest.raises(RuntimeError, match="Unknown storage backend"):
         StorageRegistry.resolve()
+
+
+#
+# Version retention
+#
+
+
+def test_retention_defaults_to_two():
+
+    assert InstallationConfig().version_retention == 2
+
+
+def test_retention_round_trips():
+
+    ConfigurationService.set_retention(5)
+
+    assert ConfigurationService.load().version_retention == 5
+
+
+def test_retention_of_zero_means_unlimited():
+
+    ConfigurationService.set_retention(0)
+
+    assert ConfigurationService.load().version_retention == 0
+
+
+def test_retention_rejects_a_negative_count():
+
+    with pytest.raises(ValueError):
+        ConfigurationService.set_retention(-1)
+
+
+def test_a_config_without_retention_gets_the_default():
+    """
+    Installations created before retention existed.
+    """
+
+    ConfigurationService.path().write_text(
+        json.dumps({"storage_backend": "local", "storage_root": "/tmp/x"}),
+        encoding="utf-8",
+    )
+
+    assert ConfigurationService.load().version_retention == 2
+
+
+def test_a_nonsense_retention_falls_back_to_the_default():
+
+    ConfigurationService.path().write_text(
+        json.dumps(
+            {
+                "storage_backend": "local",
+                "storage_root": "/tmp/x",
+                "version_retention": "lots",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert ConfigurationService.load().version_retention == 2
