@@ -427,3 +427,123 @@ def test_unregistering_removes_the_game(registered_game):
     assert RegistryService.exists(GAME_ID) is False
 
     assert GuiFacade.games() == []
+
+
+#
+# Hidden directories
+#
+# Emulator saves live under ~/.local/share, and every component after
+# the home directory is hidden. A picker that cannot show dotfiles
+# cannot reach a single Linux save.
+#
+
+
+def _picker(parent=None):
+    """
+    Build the directory picker the Browse button uses.
+    """
+
+    from PySide6.QtCore import QDir
+    from PySide6.QtWidgets import QFileDialog
+
+    dialog = QFileDialog(parent, "Select a folder")
+
+    dialog.setFileMode(QFileDialog.FileMode.Directory)
+
+    dialog.setOption(QFileDialog.Option.ShowDirsOnly, True)
+
+    dialog.setOption(QFileDialog.Option.DontUseNativeDialog, True)
+
+    dialog.setFilter(dialog.filter() | QDir.Filter.Hidden)
+
+    return dialog
+
+
+def test_the_picker_lists_hidden_directories(qt_app, tmp_path):
+
+    from PySide6.QtCore import QDir
+
+    (tmp_path / ".local").mkdir()
+
+    (tmp_path / "Documents").mkdir()
+
+    dialog = _picker()
+
+    dialog.setDirectory(str(tmp_path))
+
+    listed = set(
+        dialog.directory().entryList(
+            dialog.filter() | QDir.Filter.NoDotAndDotDot
+        )
+    )
+
+    assert ".local" in listed
+
+    assert "Documents" in listed
+
+
+def test_the_default_picker_would_not_have(qt_app, tmp_path):
+    """
+    The convenience function offers no way to change this, which is
+    why the dialog is built by hand.
+    """
+
+    from PySide6.QtCore import QDir
+    from PySide6.QtWidgets import QFileDialog
+
+    dialog = QFileDialog()
+
+    dialog.setFileMode(QFileDialog.FileMode.Directory)
+
+    assert not bool(dialog.filter() & QDir.Filter.Hidden)
+
+
+def test_a_game_can_be_registered_at_a_hidden_path(qt_app, tmp_path):
+    """
+    The real shape of an Eden save location.
+    """
+
+    from savecloud.gui.dialogs import ACCEPTED, RegisterDialog
+
+    save = (
+        tmp_path
+        / ".local/share/eden/nand/user/save/0000000000000000"
+        / "1194B8A5A401B4CE44808A6B1DBF10B2/0100F43008C44000"
+    )
+
+    save.mkdir(parents=True)
+
+    (save / "save.dat").write_text("contents")
+
+    dialog = RegisterDialog()
+
+    dialog.display_name.setText("Breath of the Wild")
+
+    dialog.identifier.setText(str(save))
+
+    dialog.launch_command.setText("true")
+
+    dialog.submit()
+
+    assert dialog.result() == ACCEPTED
+
+    assert GuiFacade.detail("breath-of-the-wild").working_save_path == str(save)
+
+
+def test_a_home_relative_path_is_expanded(qt_app, tmp_path, monkeypatch):
+    """
+    Typing ~/... has to work, since that is how these paths are
+    written down and pasted.
+    """
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    save = tmp_path / ".local/share/eden/saves"
+
+    save.mkdir(parents=True)
+
+    outcome = GuiFacade.locate_save("manual", "~/.local/share/eden/saves")
+
+    assert outcome.ok is True
+
+    assert outcome.value == str(save)

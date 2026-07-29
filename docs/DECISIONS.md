@@ -710,6 +710,15 @@ Removing a game asks first and says what is deleted. "Remove" sounds
 reversible; deleting the library is the one action in the interface
 that is not.
 
+The directory picker is built rather than taken from the convenience
+function, so hidden directories can be shown. Emulator saves live
+under `~/.local/share`, and every component after the home directory
+is hidden - a picker with Qt's default filter cannot reach a single
+Linux save. Qt's own dialog is used rather than the desktop's, because
+the native one keeps a notion of hidden files this cannot set.
+Reported from the field: an Eden save path could not be selected at
+all.
+
 Dropbox authorization opens a real browser rather than embedding one.
 The browser someone already trusts with their password is not one this
 application should be reimplementing, and Dropbox hands back a code to

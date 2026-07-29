@@ -13,6 +13,9 @@ must stay alive across a thread boundary to receive its own result.
 
 from __future__ import annotations
 
+from pathlib import Path
+
+from PySide6.QtCore import QDir
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -128,11 +131,54 @@ def _directory_row(field: QLineEdit, parent: QWidget) -> QWidget:
     button = QPushButton("Browse…")
 
     def browse() -> None:
+        """
+        Pick a directory, hidden ones included.
 
-        chosen = QFileDialog.getExistingDirectory(parent, "Select a folder")
+        Emulator saves live under `~/.local/share`, and every part of
+        that path after the home directory is hidden. A picker that
+        cannot show dotfiles cannot reach a single Linux save, so this
+        builds the dialog rather than using the convenience function -
+        which offers no way to change the filter.
+
+        Qt's own dialog is used rather than the desktop's, because the
+        native one keeps its own notion of hidden files that this
+        cannot set.
+        """
+
+        dialog = QFileDialog(parent, "Select a folder")
+
+        dialog.setFileMode(QFileDialog.FileMode.Directory)
+
+        dialog.setOption(QFileDialog.Option.ShowDirsOnly, True)
+
+        dialog.setOption(QFileDialog.Option.DontUseNativeDialog, True)
+
+        dialog.setFilter(dialog.filter() | QDir.Filter.Hidden)
+
+        #
+        # Start where the field points, so correcting a path does not
+        # mean navigating back to it from the home directory.
+        #
+
+        current = field.text().strip()
+
+        if current:
+
+            start = Path(current).expanduser()
+
+            if not start.is_dir():
+                start = start.parent
+
+            if start.is_dir():
+                dialog.setDirectory(str(start))
+
+        if dialog.exec() != ACCEPTED:
+            return
+
+        chosen = dialog.selectedFiles()
 
         if chosen:
-            field.setText(chosen)
+            field.setText(chosen[0])
 
     button.clicked.connect(browse)
 
