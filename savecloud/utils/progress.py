@@ -13,6 +13,7 @@ it is running interactively.
 
 from __future__ import annotations
 
+import threading
 from typing import Callable, Optional
 
 #
@@ -53,6 +54,10 @@ def report(message: str) -> None:
 class Progress:
     """
     Reports "doing X (3/12)" while working through a known total.
+
+    Safe to step from several threads, since transfers run in parallel
+    and two workers finishing at once must not lose a count or
+    interleave a line.
     """
 
     def __init__(
@@ -65,16 +70,22 @@ class Progress:
         self.total = total
         self.done = 0
 
+        self._lock = threading.Lock()
+
     def step(self, detail: str = "") -> None:
         """
         Record one completed unit.
         """
 
-        self.done += 1
+        with self._lock:
 
-        if self.total <= 1 and not detail:
-            return
+            self.done += 1
 
-        suffix = f" {detail}" if detail else ""
+            done = self.done
 
-        report(f"{self.label} ({self.done}/{self.total}){suffix}")
+            if self.total <= 1 and not detail:
+                return
+
+            suffix = f" {detail}" if detail else ""
+
+            report(f"{self.label} ({done}/{self.total}){suffix}")

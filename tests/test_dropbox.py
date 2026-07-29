@@ -949,3 +949,128 @@ def test_a_recovered_network_clears_the_remembered_failure(
     assert DropboxStorageBackend.available() is True
 
     assert DropboxStorageBackend._probe_failure is None
+
+
+#
+# Parallel transfers
+#
+# Each file costs a round trip, so a save is latency-bound. Running
+# transfers concurrently is what makes a Steam Deck's sync bearable.
+#
+
+
+def test_every_file_of_a_large_save_arrives(dropbox, tmp_path):
+    """
+    Concurrency must not drop or duplicate a file.
+    """
+
+    working = tmp_path / "working"
+
+    working.mkdir()
+
+    for index in range(40):
+        (working / f"slot{index:02d}.dat").write_text(f"contents {index}")
+
+    register_game(working, game_id="big")
+
+    SyncService.upload(RegistryService.load_game("big"))
+
+    stored = {
+        path.rsplit("/", 1)[1]
+        for path in dropbox.files
+        if "/games/big/current/" in path
+    }
+
+    assert len(stored) == 40
+
+    for index in range(40):
+        assert f"slot{index:02d}.dat" in stored
+
+
+def test_a_failed_transfer_is_raised_not_swallowed(dropbox, tmp_path):
+    """
+    A partial upload reported as success would leave storage holding a
+    save that never existed on any device.
+    """
+
+    working = tmp_path / "working"
+
+    working.mkdir()
+
+    for index in range(20):
+        (working / f"slot{index:02d}.dat").write_text("contents")
+
+    register_game(working, game_id="failing")
+
+    real_upload = DropboxStorageBackend.client().upload
+
+    def fail_on_one(remote_path, data):
+        if remote_path.endswith("slot07.dat"):
+            raise DropboxError("upload rejected")
+
+        return real_upload(remote_path, data)
+
+    DropboxStorageBackend.client().upload = fail_on_one
+
+    try:
+        with pytest.raises(DropboxError):
+            SyncService.upload(RegistryService.load_game("failing"))
+
+    finally:
+        DropboxStorageBackend.client().upload = real_upload
+
+
+def test_a_downloaded_save_is_reassembled_intact(dropbox, tmp_path):
+    """
+    The round trip, not just the upload.
+    """
+
+    working = tmp_path / "working"
+
+    working.mkdir()
+
+    expected = {f"slot{index:02d}.dat": f"contents {index}" for index in range(30)}
+
+    for name, contents in expected.items():
+        (working / name).write_text(contents)
+
+    register_game(working, game_id="roundtrip")
+
+    SyncService.upload(RegistryService.load_game("roundtrip"))
+
+    for path in working.iterdir():
+        path.unlink()
+
+    SyncService.download(RegistryService.load_game("roundtrip"))
+
+    for name, contents in expected.items():
+        assert (working / name).read_text() == contents
+
+
+def test_progress_counts_every_file_under_concurrency(dropbox, tmp_path, monkeypatch):
+    """
+    Two workers finishing at once must not lose a count.
+    """
+
+    from savecloud.utils import progress as progress_module
+
+    seen = []
+
+    monkeypatch.setattr(progress_module, "_reporter", seen.append)
+
+    working = tmp_path / "working"
+
+    working.mkdir()
+
+    for index in range(25):
+        (working / f"slot{index:02d}.dat").write_text("contents")
+
+    register_game(working, game_id="counted")
+
+    SyncService.upload(RegistryService.load_game("counted"))
+
+    uploads = [line for line in seen if line.startswith("Uploading (")]
+
+    counts = sorted(int(line.split("(")[1].split("/")[0]) for line in uploads)
+
+    assert counts == list(range(1, 26))

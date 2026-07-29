@@ -25,8 +25,11 @@ from __future__ import annotations
 import json
 import shutil
 import tempfile
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path, PurePosixPath
+from typing import Any, Callable, Sequence
 
 from savecloud.config import layout
 from savecloud.models.game import Game
@@ -59,11 +62,64 @@ MAX_UPLOAD_BYTES = 150 * 1024 * 1024
 
 TOKEN_EXPIRY_MARGIN = 120
 
+#
+# Each file costs a full round trip, and a save is many small files, so
+# the transfer is latency-bound rather than bandwidth-bound. Running
+# several at once turns a sum of round trips into roughly the slowest
+# of each batch, which is the difference between a minute and a few
+# seconds on a Steam Deck's wireless connection.
+#
+# Kept modest deliberately: Dropbox rate-limits per account, and a
+# save is not worth being throttled over.
+#
+
+TRANSFER_WORKERS = 8
+
 
 class DropboxError(RuntimeError):
     """
     A Dropbox operation failed.
     """
+
+
+def _in_parallel(
+    work: "Callable[[Any], None]",
+    items: "Sequence[Any]",
+) -> None:
+    """
+    Run ``work`` over ``items`` across a small pool of threads.
+
+    The first failure is raised, after the pool has drained. Failing
+    loudly matters more than finishing the rest: a partial upload that
+    reported success would leave storage holding a save that never
+    existed on any device.
+
+    Short sequences run inline, since a thread pool costs more than a
+    round trip saved.
+    """
+
+    if not items:
+        return
+
+    if len(items) == 1:
+        work(items[0])
+
+        return
+
+    workers = min(TRANSFER_WORKERS, len(items))
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+
+        futures = [pool.submit(work, item) for item in items]
+
+        failures = [
+            future.exception()
+            for future in as_completed(futures)
+            if future.exception() is not None
+        ]
+
+    if failures:
+        raise failures[0]
 
 
 class DropboxClient:
@@ -88,6 +144,14 @@ class DropboxClient:
         self._access_token: str | None = None
         self._expires_at: float = 0.0
 
+        #
+        # Transfers run in parallel and all share this client. Without
+        # the lock, every worker that noticed an expired token would
+        # refresh it at once.
+        #
+
+        self._token_lock = threading.Lock()
+
     # ------------------------------------------------------------------
     # Authentication
     # ------------------------------------------------------------------
@@ -104,6 +168,17 @@ class DropboxClient:
         timeout
             Seconds to wait. A reachability probe passes a short one,
             since it is only asking whether Dropbox answers at all.
+        """
+
+        with self._token_lock:
+            return self._refresh_if_needed(timeout)
+
+    def _refresh_if_needed(
+        self,
+        timeout: int,
+    ) -> str:
+        """
+        Return the cached token, refreshing it once if it has expired.
         """
 
         if self._access_token and time.time() < self._expires_at:
@@ -804,7 +879,7 @@ class DropboxStorageBackend(BaseStorageBackend):
 
         progress = Progress(label, len(files))
 
-        for relative in files:
+        def send(relative: Path) -> None:
 
             client.upload(
                 f"{remote_path}/{relative.as_posix()}",
@@ -812,6 +887,8 @@ class DropboxStorageBackend(BaseStorageBackend):
             )
 
             progress.step(relative.as_posix())
+
+        _in_parallel(send, files)
 
     @classmethod
     def _pull_directory(
@@ -857,13 +934,24 @@ class DropboxStorageBackend(BaseStorageBackend):
 
         progress = Progress("Downloading", len(wanted))
 
-        for full, target in wanted:
+        #
+        # Directories are created up front rather than inside the
+        # workers, so two threads writing into the same new folder
+        # cannot race each other creating it.
+        #
 
+        for _, target in wanted:
             target.parent.mkdir(parents=True, exist_ok=True)
+
+        def fetch(item: tuple[str, Path]) -> None:
+
+            full, target = item
 
             target.write_bytes(client.download(full))
 
             progress.step(target.name)
+
+        _in_parallel(fetch, wanted)
 
     @classmethod
     def _prune(

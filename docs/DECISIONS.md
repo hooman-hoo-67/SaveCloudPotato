@@ -664,6 +664,55 @@ Accepted
 
 ---
 
+## Cloud transfers run in parallel
+
+Date: 2026-07-29
+
+Context
+
+Syncing to Dropbox from a Steam Deck was slow enough to be reported as
+a problem in its own right. Progress reporting had already established
+it was not a hang, which left the question of why it took so long.
+
+A save is many small files, and each one cost a full round trip issued
+one after another. The transfer was latency-bound, not bandwidth-bound:
+almost all of the time was spent waiting rather than moving data.
+
+Decision
+
+Uploads and downloads run across a pool of eight threads.
+
+Measured against the in-memory fake with an 80ms round trip injected -
+typical for a Deck on wireless - a 40-file save went from 8.1s to 2.9s.
+
+Eight is deliberately modest. Dropbox rate-limits per account, and a
+save is not worth being throttled over.
+
+Consequences
+
+`Progress` is now stepped from several threads, so its counter is
+locked. Without that, two workers finishing together would lose a
+count and the reported total would drift below the real one.
+
+The access token is refreshed under a lock. Every worker shares one
+client, so an expired token would otherwise have every thread
+refreshing it simultaneously.
+
+Destination directories are created before the workers start rather
+than inside them, so two threads writing into the same new folder
+cannot race creating it.
+
+The first failure is raised once the pool has drained. Continuing
+after a failed file would leave storage holding a save that never
+existed on any device, and reporting success for it would be worse
+than the delay this change removes.
+
+Status
+
+Accepted
+
+---
+
 ## A terminated game is not a crashed game
 
 Date: 2026-07-29
