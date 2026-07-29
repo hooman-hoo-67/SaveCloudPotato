@@ -6,7 +6,10 @@ data - so a view can be built and tested without an installation, and
 so the questions the interface asks are visible in one file rather
 than scattered across windows.
 
-Read-only by design for now. Nothing here writes.
+Readers return data and may raise. Actions return an `Outcome` and
+never raise, because a window cannot catch an exception thrown on a
+worker thread - and because a conflict is a question to ask rather
+than a failure to report.
 """
 
 from __future__ import annotations
@@ -22,7 +25,37 @@ from savecloud.services.diagnostics import DiagnosticsService
 from savecloud.services.library import SaveCloudLibrary
 from savecloud.services.registry import RegistryService
 from savecloud.services.save import SaveService
+from savecloud.services.sync import (
+    ConflictResolution,
+    StorageUnavailableError,
+    SyncAction,
+    SyncConflictError,
+    SyncService,
+)
 from savecloud.storage import StorageRegistry
+
+
+@dataclass(slots=True)
+class Outcome:
+    """
+    What an action did, or why it did not.
+
+    Actions return this rather than raising: a window cannot catch an
+    exception thrown on a worker thread, and a conflict is not an
+    error - it is a question the interface has to ask.
+    """
+
+    ok: bool
+    message: str = ""
+    game_id: str = ""
+    action: str = ""
+
+    #
+    # Set when both sides changed. The interface must offer a choice
+    # rather than report a failure.
+    #
+
+    conflict: bool = False
 
 
 @dataclass(slots=True)
@@ -260,6 +293,226 @@ class GuiFacade:
         """
 
         return SaveCloudLibrary.library_directory(game_id)
+
+    # ------------------------------------------------------------------
+    # Actions
+    #
+    # Each returns an Outcome rather than raising. A window cannot
+    # catch an exception thrown on a worker thread, and a conflict is
+    # not an error anyway - it is a question, and the interface needs
+    # enough structure to ask it.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def sync(
+        game_id: str,
+        resolution: str = "abort",
+    ) -> Outcome:
+        """
+        Synchronize one game.
+
+        Parameters
+        ----------
+        game_id
+            Game to synchronize.
+        resolution
+            "abort", "keep-local", or "keep-remote".
+        """
+
+        choice = {
+            "keep-local": ConflictResolution.LOCAL,
+            "keep-remote": ConflictResolution.REMOTE,
+        }.get(resolution, ConflictResolution.ABORT)
+
+        try:
+            action = SyncService.sync(
+                RegistryService.load_game(game_id),
+                choice,
+            )
+
+        except SyncConflictError:
+            return Outcome(
+                ok=False,
+                conflict=True,
+                game_id=game_id,
+                message=(
+                    "This device and the remote have both changed since "
+                    "they last agreed."
+                ),
+            )
+
+        except StorageUnavailableError as error:
+            return Outcome(ok=False, game_id=game_id, message=str(error))
+
+        except Exception as error:
+            return Outcome(ok=False, game_id=game_id, message=str(error))
+
+        return Outcome(
+            ok=True,
+            game_id=game_id,
+            message={
+                SyncAction.UPLOAD: "Uploaded this device's save.",
+                SyncAction.DOWNLOAD: "Downloaded the remote save.",
+                SyncAction.UP_TO_DATE: "Already up to date.",
+            }.get(action, "Synchronized."),
+            action=action.value,
+        )
+
+    @staticmethod
+    def sync_all() -> Outcome:
+        """
+        Synchronize every game this device takes part in.
+        """
+
+        try:
+            results = SyncService.sync_all()
+
+        except Exception as error:
+            return Outcome(ok=False, message=str(error))
+
+        if not results:
+            return Outcome(ok=True, message="Nothing to synchronize.")
+
+        failures = {
+            game_id: outcome
+            for game_id, outcome in results.items()
+            if not isinstance(outcome, SyncAction)
+        }
+
+        if failures:
+            return Outcome(
+                ok=False,
+                message="\n".join(
+                    f"{game_id}: {reason}"
+                    for game_id, reason in sorted(failures.items())
+                ),
+            )
+
+        return Outcome(
+            ok=True,
+            message=f"Synchronized {len(results)} games.",
+        )
+
+    @staticmethod
+    def snapshot(game_id: str) -> Outcome:
+        """
+        Capture the working save as a new version.
+        """
+
+        try:
+            version = SaveService.create_version(
+                RegistryService.load_game(game_id),
+            )
+
+        except Exception as error:
+            return Outcome(ok=False, game_id=game_id, message=str(error))
+
+        return Outcome(
+            ok=True,
+            game_id=game_id,
+            message=f"Created version {version}.",
+        )
+
+    @staticmethod
+    def restore(game_id: str, version: int) -> Outcome:
+        """
+        Restore a version, preserving what it replaces.
+        """
+
+        try:
+            SaveService.restore_version(
+                RegistryService.load_game(game_id),
+                version,
+            )
+
+        except Exception as error:
+            return Outcome(ok=False, game_id=game_id, message=str(error))
+
+        return Outcome(
+            ok=True,
+            game_id=game_id,
+            message=(
+                f"Restored version {version}. What it replaced was kept "
+                f"as a new version."
+            ),
+        )
+
+    @staticmethod
+    def set_auto_sync(game_id: str, enabled: bool) -> Outcome:
+        """
+        Choose whether this device synchronizes a game automatically.
+        """
+
+        device_id = SaveCloudLibrary.device_id()
+
+        if not DeviceService.exists(device_id, game_id):
+            return Outcome(
+                ok=False,
+                game_id=game_id,
+                message="This game is not set up on this device.",
+            )
+
+        profile = DeviceService.load_profile(device_id, game_id)
+
+        profile.enabled = enabled
+
+        DeviceService.save_profile(profile)
+
+        return Outcome(
+            ok=True,
+            game_id=game_id,
+            message=(
+                f"Automatic sync {'enabled' if enabled else 'disabled'} "
+                f"on this device."
+            ),
+        )
+
+    @staticmethod
+    def play(game_id: str) -> Outcome:
+        """
+        Synchronize, launch, wait for exit, and capture the session.
+
+        Blocking for as long as the game runs, so callers put it on a
+        worker thread and leave it there.
+        """
+
+        from savecloud.services.autosync import (
+            AutoSyncService,
+            UntrackableLaunchError,
+        )
+
+        try:
+            result = AutoSyncService.play(RegistryService.load_game(game_id))
+
+        except SyncConflictError:
+            return Outcome(
+                ok=False,
+                conflict=True,
+                game_id=game_id,
+                message=(
+                    "This game has an unresolved conflict. Playing would "
+                    "build new progress on top of it."
+                ),
+            )
+
+        except UntrackableLaunchError as error:
+            return Outcome(ok=False, game_id=game_id, message=str(error))
+
+        except Exception as error:
+            return Outcome(ok=False, game_id=game_id, message=str(error))
+
+        lines = [f"Game exited with code {result.exit_code}."]
+
+        if result.uploaded:
+            lines.append("The session was uploaded.")
+
+        lines.extend(result.warnings)
+
+        return Outcome(
+            ok=result.exit_code == 0,
+            game_id=game_id,
+            message="\n".join(lines),
+        )
 
 
 def _device(recorded: str | None, here: str) -> str:

@@ -664,6 +664,58 @@ Accepted
 
 ---
 
+## Interface actions return outcomes, not exceptions
+
+Date: 2026-07-29
+
+Context
+
+Adding buttons to the read-only window meant deciding how a failure
+crosses back from a worker thread.
+
+A window cannot wrap a call in `try` when the call happens on another
+thread. The exception surfaces inside the worker, and whatever
+arrives at the interface is whatever the worker chose to send.
+
+Decision
+
+Facade readers may raise. Facade actions return an `Outcome` -
+`ok`, `message`, and `conflict` - and never raise.
+
+`conflict` is a separate field rather than an error string because it
+is not a failure. Both sides hold real play time, and the interface
+must ask which to keep rather than report that something went wrong.
+The dialog offers both saves by name and says the losing one is kept
+as a version, which is what makes the choice safe to offer at all.
+
+Consequences
+
+The interface locks its controls while an action runs. The services
+are written for one caller; nothing below the interface prevents a
+second sync starting on top of the first, so the interface has to.
+
+Every action refreshes when it finishes, and refreshing rebuilds the
+game list. The selection is restored explicitly - without that, the
+buttons would be unusable after the first action, because the game
+they act on would no longer be selected.
+
+Setting the auto-sync checkbox from stored state has its signals
+blocked. Otherwise displaying a game would write back the value just
+read, and selecting a game would run an action.
+
+A game not paired on this device disables every per-game control:
+nothing knows where its save lives here.
+
+Restoring asks first. It is reversible - what it replaces becomes a
+version - and the dialog says so, because a confirmation that does not
+explain the stakes only teaches people to dismiss it.
+
+Status
+
+Accepted
+
+---
+
 ## The desktop interface imports services; the plugin will not
 
 Date: 2026-07-29

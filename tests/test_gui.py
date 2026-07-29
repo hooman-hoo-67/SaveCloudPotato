@@ -296,3 +296,304 @@ def test_health_renders_problems_with_their_remedy(qt_app):
     assert "✗ Storage backend" in rendered
 
     assert "→ Run: savecloud config validate" in rendered
+
+
+#
+# Actions
+#
+# Every one returns an Outcome rather than raising: a window cannot
+# catch an exception thrown on a worker thread.
+#
+
+
+def test_sync_reports_what_it_did(registered_game, working_save):
+
+    write_save(working_save, "progress")
+
+    outcome = GuiFacade.sync(GAME_ID)
+
+    assert outcome.ok is True
+
+    assert outcome.action == "upload"
+
+
+def test_sync_reports_a_conflict_as_a_question(registered_game, working_save):
+    """
+    Not an error. The interface has to offer a choice.
+    """
+
+    from tests.test_sync import advance_remote
+
+    GuiFacade.sync(GAME_ID)
+
+    advance_remote(GAME_ID, "remote progress")
+
+    write_save(working_save, "local progress")
+
+    outcome = GuiFacade.sync(GAME_ID)
+
+    assert outcome.ok is False
+
+    assert outcome.conflict is True
+
+
+def test_a_conflict_can_be_resolved_either_way(registered_game, working_save):
+
+    from savecloud.storage import LocalStorageBackend
+    from tests.conftest import read_save
+    from tests.test_sync import advance_remote
+
+    GuiFacade.sync(GAME_ID)
+
+    advance_remote(GAME_ID, "remote progress")
+
+    write_save(working_save, "local progress")
+
+    assert GuiFacade.sync(GAME_ID, "keep-local").ok is True
+
+    assert read_save(
+        LocalStorageBackend.current_directory(GAME_ID)
+    ) == "local progress"
+
+
+def test_the_losing_side_of_a_conflict_is_kept(registered_game, working_save):
+    """
+    What makes offering the choice safe rather than final.
+    """
+
+    from tests.test_sync import advance_remote
+
+    GuiFacade.sync(GAME_ID)
+
+    before = len(GuiFacade.detail(GAME_ID).versions)
+
+    advance_remote(GAME_ID, "remote progress")
+
+    write_save(working_save, "local progress")
+
+    GuiFacade.sync(GAME_ID, "keep-local")
+
+    assert len(GuiFacade.detail(GAME_ID).versions) > before
+
+
+def test_an_unregistered_game_fails_without_raising(registered_game):
+
+    outcome = GuiFacade.sync("never-registered")
+
+    assert outcome.ok is False
+
+    assert outcome.conflict is False
+
+
+def test_unreachable_storage_fails_without_raising(registered_game, monkeypatch):
+
+    from savecloud.storage import LocalStorageBackend
+
+    monkeypatch.setattr(
+        LocalStorageBackend,
+        "available",
+        classmethod(lambda cls: False),
+    )
+
+    outcome = GuiFacade.sync(GAME_ID)
+
+    assert outcome.ok is False
+
+    assert outcome.conflict is False
+
+
+def test_snapshot_creates_a_version(registered_game, working_save):
+
+    write_save(working_save, "progress")
+
+    before = len(GuiFacade.detail(GAME_ID).versions)
+
+    assert GuiFacade.snapshot(GAME_ID).ok is True
+
+    assert len(GuiFacade.detail(GAME_ID).versions) == before + 1
+
+
+def test_restore_reports_that_it_is_reversible(registered_game, working_save):
+
+    for index in range(3):
+        write_save(working_save, f"session {index}")
+
+        GuiFacade.sync(GAME_ID)
+
+    versions = GuiFacade.detail(GAME_ID).versions
+
+    outcome = GuiFacade.restore(GAME_ID, versions[0])
+
+    assert outcome.ok is True
+
+    assert "kept as a new version" in outcome.message
+
+
+def test_auto_sync_can_be_turned_off_and_on(registered_game):
+
+    assert GuiFacade.set_auto_sync(GAME_ID, False).ok is True
+
+    assert GuiFacade.detail(GAME_ID).auto_sync is False
+
+    assert GuiFacade.set_auto_sync(GAME_ID, True).ok is True
+
+    assert GuiFacade.detail(GAME_ID).auto_sync is True
+
+
+def test_auto_sync_refuses_an_unpaired_game(registered_game):
+
+    from savecloud.services.device import DeviceService
+    from savecloud.services.library import SaveCloudLibrary
+
+    DeviceService.delete_profile(SaveCloudLibrary.device_id(), GAME_ID)
+
+    outcome = GuiFacade.set_auto_sync(GAME_ID, False)
+
+    assert outcome.ok is False
+
+    assert "not set up" in outcome.message
+
+
+def test_sync_all_reports_a_count(registered_game, working_save):
+
+    write_save(working_save, "progress")
+
+    outcome = GuiFacade.sync_all()
+
+    assert outcome.ok is True
+
+    assert "1 games" in outcome.message
+
+
+#
+# The window's action wiring
+#
+
+
+def test_buttons_are_disabled_until_a_game_is_selected(qt_app, registered_game):
+
+    from savecloud.gui.window import MainWindow
+
+    window = MainWindow()
+
+    assert window.sync_button.isEnabled() is False
+
+    window.games.list.setCurrentRow(0)
+
+    assert window.sync_button.isEnabled() is True
+
+
+def test_buttons_are_disabled_for_an_unpaired_game(qt_app, registered_game):
+    """
+    Nothing knows where the save lives here, so nothing can act on it.
+    """
+
+    from savecloud.services.device import DeviceService
+    from savecloud.services.library import SaveCloudLibrary
+    from savecloud.gui.window import MainWindow
+
+    DeviceService.delete_profile(SaveCloudLibrary.device_id(), GAME_ID)
+
+    window = MainWindow()
+
+    window.games.list.setCurrentRow(0)
+
+    assert window.play_button.isEnabled() is False
+
+    assert window.auto_sync_box.isEnabled() is False
+
+
+def test_an_action_locks_the_controls_while_it_runs(qt_app, registered_game):
+    """
+    The services expect one caller. This is the only thing that can
+    stop a second sync starting on top of the first.
+    """
+
+    from savecloud.gui.window import MainWindow
+
+    window = MainWindow()
+
+    window.games.list.setCurrentRow(0)
+
+    window._sync()
+
+    assert window.sync_button.isEnabled() is False
+
+    assert window.sync_all_button.isEnabled() is False
+
+
+def test_a_second_action_is_refused_while_one_runs(qt_app, registered_game):
+
+    from savecloud.gui.window import MainWindow
+
+    window = MainWindow()
+
+    window.games.list.setCurrentRow(0)
+
+    window._working = True
+
+    started = []
+
+    window._run(lambda: started.append(1), "doing")
+
+    assert started == []
+
+
+def test_the_selection_survives_a_refresh(qt_app, registered_game):
+    """
+    Every action refreshes, and losing the selection each time would
+    make the buttons unusable.
+    """
+
+    from savecloud.gui.window import MainWindow
+
+    window = MainWindow()
+
+    window.games.list.setCurrentRow(0)
+
+    window.refresh()
+
+    assert window.games.selected() == GAME_ID
+
+
+def test_the_checkbox_reflects_the_stored_setting(qt_app, registered_game):
+
+    from savecloud.gui.window import MainWindow
+
+    GuiFacade.set_auto_sync(GAME_ID, False)
+
+    window = MainWindow()
+
+    window.games.list.setCurrentRow(0)
+
+    assert window.auto_sync_box.isChecked() is False
+
+
+def test_setting_the_checkbox_does_not_re_fire_on_refresh(
+    qt_app,
+    registered_game,
+    monkeypatch,
+):
+    """
+    Refreshing sets the checkbox from stored state. If that emitted,
+    the interface would write back what it had just read - and an
+    action would run on every selection change.
+    """
+
+    from savecloud.gui.window import MainWindow
+
+    window = MainWindow()
+
+    calls = []
+
+    monkeypatch.setattr(
+        window,
+        "_run",
+        lambda work, doing: calls.append(doing),
+    )
+
+    window.games.list.setCurrentRow(0)
+
+    window.refresh()
+
+    assert calls == []

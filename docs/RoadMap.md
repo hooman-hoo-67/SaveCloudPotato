@@ -86,16 +86,20 @@ storage framework.
 
 - [x] service facade and threading
 - [x] read-only viewer: games, state, history, health
-- [ ] sync, play, and conflict resolution
+- [x] sync, play, snapshot, restore, auto-sync toggle
+- [x] conflict resolution
 - [ ] register and pair
 - [ ] AppImage and Windows packaging
 
 PySide6, importing services in-process. Optional: `pip install
 savecloud[gui]`, then `savecloud-gui`. The CLI runs without Qt.
 
-Read-only deliberately. The threading, progress, and error paths are
-exercised on something that cannot destroy a save before any button
-that could is added.
+Actions run on worker threads with the controls locked, because the
+services expect one caller and the interface is the only thing that
+can enforce it. Anything that discards a save asks first.
+
+Registering and pairing are still CLI-only. Both are interactive
+flows, and a wizard is a different piece of work from a button.
 
 ### Not planned
 
