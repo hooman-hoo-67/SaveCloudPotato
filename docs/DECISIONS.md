@@ -664,6 +664,57 @@ Accepted
 
 ---
 
+## One packaged file, two behaviours
+
+Date: 2026-07-29
+
+Context
+
+SaveCloud has two entry points, and packaging usually means choosing
+one. Steam launch options invoke a command line; someone opening the
+application expects a window.
+
+Shipping two artifacts would mean two things to install, two paths to
+keep straight, and a launch option pointing at the one nobody opens.
+
+Decision
+
+One binary, dispatching on arguments: with them it is the CLI, without
+them the interface.
+
+Built with PyInstaller, wrapped as an AppImage on Linux and a zipped
+directory on Windows.
+
+Consequences
+
+`savecloud_executable()` had to learn about packaged builds. Inside an
+AppImage, `sys.executable` points into a temporary mount that differs
+on every run - writing it into Steam would produce launch options that
+work exactly once. The `APPIMAGE` variable names the real file and is
+checked first, with a frozen build's own `sys.executable` next.
+
+That variable can be inherited by a process that is not an AppImage,
+so it is only believed when it names something that exists.
+
+Adapters, launchers, and storage backends are reached through
+registries, so nothing imports them by name and PyInstaller cannot
+see them. They are declared as hidden imports; without that the build
+succeeds and then reports no adapters at all.
+
+The artifact is 56MB compressed, most of it Qt. `libicudata` alone is
+31MB uncompressed and could be dropped, but Qt uses ICU for text
+handling and save paths are arbitrary - so it stays.
+
+Windows binaries cannot be produced on Linux, so each platform builds
+on itself in CI. Manual runs leave artifacts without creating a
+release, which makes it possible to test a build before promising one.
+
+Status
+
+Accepted
+
+---
+
 ## Launch options name the executable by path
 
 Date: 2026-07-29

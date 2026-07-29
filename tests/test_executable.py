@@ -195,6 +195,104 @@ def test_a_file_that_cannot_be_executed_is_ignored(tmp_path, monkeypatch):
 
 
 #
+# Packaged builds
+#
+
+
+def test_an_appimage_names_itself(tmp_path, monkeypatch):
+    """
+    Inside an AppImage `sys.executable` points into a temporary mount
+    that differs on every run, so writing it into Steam would produce
+    launch options that work once.
+    """
+
+    bundle = make_executable(tmp_path / "SaveCloud-x86_64.AppImage")
+
+    monkeypatch.setenv("APPIMAGE", str(bundle))
+
+    monkeypatch.setattr(sys, "executable", "/tmp/.mount_abc123/usr/bin/python")
+
+    monkeypatch.setattr(sys, "argv", ["/tmp/.mount_abc123/usr/bin/savecloud"])
+
+    assert savecloud_executable() == bundle
+
+
+def test_an_appimage_wins_over_everything_else(tmp_path, monkeypatch):
+
+    bundle = make_executable(tmp_path / "SaveCloud.AppImage")
+
+    make_executable(tmp_path / "bin" / "savecloud")
+
+    monkeypatch.setenv("APPIMAGE", str(bundle))
+
+    monkeypatch.setattr(sys, "executable", str(tmp_path / "bin" / "python"))
+
+    monkeypatch.setattr(sys, "prefix", str(tmp_path))
+
+    assert savecloud_executable() == bundle
+
+
+def test_a_stale_appimage_variable_is_ignored(tmp_path, monkeypatch):
+    """
+    The variable can be inherited by something that is not an
+    AppImage. A path that is not there cannot be the answer.
+    """
+
+    command = make_executable(tmp_path / "bin" / "savecloud")
+
+    monkeypatch.setenv("APPIMAGE", str(tmp_path / "gone" / "Old.AppImage"))
+
+    monkeypatch.setattr(sys, "argv", ["pytest"])
+
+    monkeypatch.setattr(sys, "executable", str(tmp_path / "bin" / "python"))
+
+    monkeypatch.setattr(sys, "prefix", str(tmp_path))
+
+    assert savecloud_executable() == command
+
+
+def test_a_frozen_build_is_its_own_executable(tmp_path, monkeypatch):
+    """
+    PyInstaller without an AppImage: the interpreter is the program,
+    so there is no console script to find.
+    """
+
+    #
+    # Not directly in tmp_path: the installation fixture already uses
+    # that name for the SaveCloud home.
+    #
+
+    frozen = make_executable(tmp_path / "frozen" / "savecloud")
+
+    monkeypatch.delenv("APPIMAGE", raising=False)
+
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+
+    monkeypatch.setattr(sys, "executable", str(frozen))
+
+    monkeypatch.setattr(sys, "argv", [str(frozen)])
+
+    assert savecloud_executable() == frozen
+
+
+def test_an_unfrozen_run_ignores_the_frozen_branch(tmp_path, monkeypatch):
+
+    command = make_executable(tmp_path / "bin" / "savecloud")
+
+    monkeypatch.delenv("APPIMAGE", raising=False)
+
+    monkeypatch.setattr(sys, "frozen", False, raising=False)
+
+    monkeypatch.setattr(sys, "argv", ["pytest"])
+
+    monkeypatch.setattr(sys, "executable", str(tmp_path / "bin" / "python"))
+
+    monkeypatch.setattr(sys, "prefix", str(tmp_path))
+
+    assert savecloud_executable() == command
+
+
+#
 # The line it produces
 #
 

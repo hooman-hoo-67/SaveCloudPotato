@@ -15,7 +15,7 @@
 | 9 | Filesystem Synchronization | ✓ |
 | 10 | Steam Integration | ✓ |
 | 11 | Cloud Providers | ✓ |
-| 12 | Desktop Interface | ◐ |
+| 12 | Desktop Interface | ✓ |
 
 ---
 
@@ -90,7 +90,7 @@ storage framework.
 - [x] conflict resolution
 - [x] register, pair, edit, and remove
 - [x] installation settings, including Dropbox credentials
-- [ ] AppImage and Windows packaging
+- [x] AppImage and Windows packaging
 
 PySide6, importing services in-process. Optional: `pip install
 savecloud[gui]`, then `savecloud-gui`. The CLI runs without Qt.
@@ -104,6 +104,14 @@ dialog, so a refusal never discards what was typed.
 
 Nothing in the interface is CLI-only any more, apart from `doctor
 --strict` and the deliberate `upload`/`download` overrides.
+
+Packaged as a single file that is both: opened from a menu it shows a
+window, given arguments it is the command line. `packaging/build-
+appimage.sh` builds it; the release workflow builds Linux and Windows
+on tagged pushes, since a Windows binary cannot be produced on Linux.
+
+An AppImage stays where it is put, which a virtual environment does
+not - so Steam launch options written against one keep working.
 
 ### Not planned
 

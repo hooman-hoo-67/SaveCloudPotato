@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=SaveCloud
+GenericName=Save Synchronization
+Comment=Steam Cloud for everything
+Exec=savecloud
+Icon=savecloud
+Categories=Game;Utility;
+Terminal=false

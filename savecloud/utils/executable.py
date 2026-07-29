@@ -31,6 +31,30 @@ def savecloud_executable() -> Path | None:
     """
 
     #
+    # Inside an AppImage. `sys.executable` there points into a
+    # temporary mount that is different on every run, so it is exactly
+    # the wrong thing to write into Steam. The AppImage file itself is
+    # the stable path, and AppImage names it here.
+    #
+
+    bundle = os.environ.get("APPIMAGE")
+
+    if bundle and _runnable(Path(bundle)):
+        return Path(bundle)
+
+    #
+    # A frozen build that is not an AppImage. The interpreter *is* the
+    # program, so there is no console script to look for.
+    #
+
+    if getattr(sys, "frozen", False):
+
+        frozen = Path(sys.executable)
+
+        if _runnable(frozen):
+            return frozen
+
+    #
     # How this process was started, when it was started by the console
     # script. The most direct answer available, and the right one when
     # several installations exist.

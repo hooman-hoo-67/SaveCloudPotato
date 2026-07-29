@@ -6,6 +6,33 @@ SaveCloud gives cloud saves to games that do not have them: emulators,
 Proton games, native Linux games, and anything else you can launch.
 It works the same regardless of where a game came from.
 
+## Installing
+
+Download `SaveCloud-x86_64.AppImage` from the releases page, make it
+executable, and run it:
+
+```
+chmod +x SaveCloud-x86_64.AppImage
+./SaveCloud-x86_64.AppImage
+```
+
+One file is both the interface and the command line. Opened on its own
+it shows a window; given arguments it behaves like the CLI, which is
+what makes it usable in Steam launch options:
+
+```
+/path/to/SaveCloud-x86_64.AppImage wrap hollow-knight -- %command%
+```
+
+`savecloud doctor -v` prints the correct line for wherever it is
+installed.
+
+From source instead:
+
+```
+pip install -e ".[gui]"
+```
+
 ## Goals
 
 - Sync emulator saves

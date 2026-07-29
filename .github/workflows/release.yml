@@ -1,0 +1,107 @@
+name: Build release artifacts
+
+#
+# Windows binaries cannot be produced on Linux, so each platform is
+# built on itself. Tagged pushes attach the results to a release;
+# manual runs leave them as artifacts, which is what makes it possible
+# to test a build without first promising one.
+#
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[gui]"
+          pip install pyinstaller
+
+      - name: Fetch appimagetool
+        run: |
+          curl -sSL -o appimagetool \
+            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool
+          # No FUSE on a runner; extracting is how appimagetool itself
+          # says to run without it.
+          ./appimagetool --appimage-extract > /dev/null
+          echo "APPIMAGETOOL=$PWD/squashfs-root/AppRun" >> "$GITHUB_ENV"
+
+      - name: Build
+        run: packaging/build-appimage.sh
+
+      - name: Check it runs
+        run: |
+          ./dist/SaveCloud-x86_64.AppImage --appimage-extract > /dev/null
+          ./squashfs-root/AppRun --help
+          ./squashfs-root/AppRun --json list
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SaveCloud-linux-x86_64
+          path: dist/SaveCloud-x86_64.AppImage
+
+  windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[gui]"
+          pip install pyinstaller
+
+      - name: Build
+        run: python -m PyInstaller --noconfirm --distpath dist --workpath build packaging/savecloud.spec
+
+      - name: Check it runs
+        run: |
+          dist\savecloud\savecloud.exe --help
+          dist\savecloud\savecloud.exe --json list
+
+      - name: Compress
+        run: Compress-Archive -Path dist\savecloud\* -DestinationPath SaveCloud-windows-x86_64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SaveCloud-windows-x86_64
+          path: SaveCloud-windows-x86_64.zip
+
+  release:
+    needs: [linux, windows]
+
+    if: startsWith(github.ref, 'refs/tags/')
+
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          generate_release_notes: true
