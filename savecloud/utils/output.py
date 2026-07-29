@@ -8,7 +8,9 @@ may call services, but it never implements a workflow.
 
 from __future__ import annotations
 
+import json
 import sys
+from typing import Any
 
 import typer
 
@@ -19,6 +21,63 @@ from savecloud.services.library import SaveCloudLibrary
 from savecloud.services.registry import RegistryService
 from savecloud.services.sync import ConflictResolution, SyncConflictError
 from savecloud.utils import progress
+
+
+#
+# Machine-readable output. Set once by the top-level --json option, and
+# read by any command that has a structured form worth emitting.
+#
+# A flag rather than a separate set of commands: a GUI and a person ask
+# the same questions, and two code paths answering them would drift.
+#
+
+_json = False
+
+
+def set_json(enabled: bool) -> None:
+    """
+    Choose whether commands emit JSON instead of prose.
+    """
+
+    global _json
+
+    _json = enabled
+
+
+def json_mode() -> bool:
+    """
+    Return whether machine-readable output was requested.
+    """
+
+    return _json
+
+
+def emit(payload: Any) -> None:
+    """
+    Write a JSON document to stdout.
+
+    One document per command, on stdout alone. Progress and warnings go
+    to stderr, so a caller can parse stdout without filtering it.
+    """
+
+    typer.echo(json.dumps(payload, indent=2, default=str))
+
+
+def fail(message: str, **fields: Any) -> None:
+    """
+    Report a failure in whichever form was asked for, then exit 1.
+
+    Callers get the same exit code either way, so a script can check
+    the status without parsing anything.
+    """
+
+    if _json:
+        emit({"ok": False, "error": message, **fields})
+
+    else:
+        typer.secho(f"✗ {message}", fg=typer.colors.RED)
+
+    raise typer.Exit(code=1)
 
 
 def require_game(game_id: str) -> Game:
@@ -121,7 +180,7 @@ def show_progress(quiet: bool = False) -> None:
     rather than filling a log with partial lines.
     """
 
-    if quiet or not sys.stderr.isatty():
+    if quiet or _json or not sys.stderr.isatty():
         progress.set_reporter(None)
         return
 

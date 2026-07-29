@@ -27,11 +27,34 @@ from savecloud.commands import (
     upload,
     wrap,
 )
+from savecloud.utils import output
 
 app = typer.Typer(
     help="Steam Cloud for everything.",
     no_args_is_help=True,
 )
+
+
+@app.callback()
+def main(
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        help="Emit machine-readable output instead of prose.",
+    ),
+) -> None:
+    """
+    Steam Cloud for everything.
+    """
+
+    #
+    # Set before any command runs, so a command need only ask whether
+    # it was requested. A flag rather than a parallel set of commands:
+    # a GUI and a person ask the same questions, and two code paths
+    # answering them would drift apart.
+    #
+
+    output.set_json(json_output)
 
 #
 # Installation

@@ -19,6 +19,7 @@ from savecloud.services.library import SaveCloudLibrary
 from savecloud.services.registry import RegistryService
 from savecloud.services.save import SaveService
 from savecloud.services.sync import StorageUnavailableError, SyncService
+from savecloud.utils import output
 from savecloud.utils.prompt import choose_option, prompt_required
 
 def list_remote(remote: list[str]) -> None:
@@ -26,11 +27,29 @@ def list_remote(remote: list[str]) -> None:
     Report which games storage holds and their state here.
     """
 
+    device_id = SaveCloudLibrary.device_id()
+
+    if output.json_mode():
+
+        output.emit(
+            {
+                "ok": True,
+                "games": [
+                    {
+                        "game_id": game_id,
+                        "paired": DeviceService.exists(device_id, game_id),
+                        "registered": RegistryService.exists(game_id),
+                    }
+                    for game_id in remote
+                ],
+            }
+        )
+
+        return
+
     if not remote:
         typer.echo("Storage holds no games.")
         return
-
-    device_id = SaveCloudLibrary.device_id()
 
     typer.echo("Games in storage")
     typer.echo("----------------")

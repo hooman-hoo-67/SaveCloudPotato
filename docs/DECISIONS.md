@@ -664,6 +664,60 @@ Accepted
 
 ---
 
+## A --json flag, not a second set of commands
+
+Date: 2026-07-29
+
+Context
+
+Two graphical front ends are planned - a desktop application and a
+Decky Loader plugin - and they will differ a great deal from each
+other. What they must not differ in is what they call.
+
+The risk is a plugin reimplementing sync logic in another language
+because driving the CLI is awkward. Two conflict resolvers that
+disagree is a worse outcome than any amount of duplicated interface
+code.
+
+Decision
+
+A top-level `--json` option. Commands that have a structured form emit
+one JSON document on stdout; everything else is unchanged.
+
+Considered and rejected: a parallel set of machine-readable commands,
+or a daemon with a socket. A GUI and a person ask the same questions -
+what is registered, what would sync do, what is wrong - and two code
+paths answering them would drift apart, with the human one getting the
+attention.
+
+Consequences
+
+`--json` changes how a command reports, never what it does. Exit codes
+are identical either way, so a caller can check success without
+parsing anything.
+
+Failures are documents too. A conflict reports its available
+resolutions rather than prose telling a person which flag to type,
+because that is the case a GUI must render as a choice rather than an
+error.
+
+Progress goes to stderr, so stdout stays parseable on its own. The
+progress reporter is suppressed entirely in JSON mode regardless.
+
+The flag is process-wide state set by the top-level callback, which
+tests must not let leak between invocations. One asserts exactly that.
+
+Interface coverage is deliberately partial: the read commands a front
+end polls, plus `sync`. Interactive commands like `register` and
+`pair` prompt, and a prompt has no JSON form worth inventing before a
+GUI exists to say what it needs.
+
+Status
+
+Accepted
+
+---
+
 ## Cloud transfers run in parallel
 
 Date: 2026-07-29

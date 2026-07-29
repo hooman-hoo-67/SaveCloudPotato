@@ -5,6 +5,45 @@ workflow itself.
 
 ---
 
+## Machine-readable output
+
+### `savecloud --json COMMAND ...`
+
+Emit a JSON document instead of prose. The option goes before the
+command, since it applies to whichever one follows.
+
+```
+savecloud --json list
+savecloud --json sync pokemon-scarlet --check
+savecloud --json doctor --verbose
+```
+
+Supported by `list`, `info`, `history`, `sync`, `config show`,
+`doctor`, and `pair --list`.
+
+One document per command, on stdout alone. Progress goes to stderr, so
+stdout can be parsed without filtering it.
+
+Every document carries `ok`. A failure keeps the exit code it would
+have had and reports the reason in the same shape, so a caller can
+check the status without parsing anything:
+
+```json
+{
+  "ok": false,
+  "game_id": "pokemon-scarlet",
+  "action": "conflict",
+  "error": "Both this device and the remote have changed.",
+  "resolutions": ["keep-local", "keep-remote"]
+}
+```
+
+`--json` changes how a command reports, never what it does. A flag
+rather than a separate set of commands, because a GUI and a person ask
+the same questions and two code paths answering them would drift.
+
+---
+
 ## Installation
 
 ### `savecloud init`

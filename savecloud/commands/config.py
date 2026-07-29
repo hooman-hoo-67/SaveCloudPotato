@@ -12,6 +12,7 @@ from savecloud.services.configuration import ConfigurationService
 from savecloud.services.save import SaveService
 from savecloud.services.sync import SyncService
 from savecloud.storage import StorageRegistry
+from savecloud.utils import output
 
 app = typer.Typer(
     help="Manage installation-wide configuration.",
@@ -27,6 +28,26 @@ def show() -> None:
     config = ConfigurationService.load()
 
     backend = StorageRegistry.get(config.storage_backend)
+
+    if output.json_mode():
+
+        output.emit(
+            {
+                "ok": True,
+                "config_file": str(ConfigurationService.path()),
+                "exists": ConfigurationService.exists(),
+                "storage_backend": config.storage_backend,
+                "storage_root": str(config.storage_root),
+                "version_retention": config.version_retention,
+                "backend_known": backend is not None,
+                "backend_available": bool(backend and backend.available()),
+                "unavailable_reason": None
+                if backend is None or backend.available()
+                else backend.unavailable_reason(),
+            }
+        )
+
+        return
 
     typer.echo("Installation Configuration")
     typer.echo("--------------------------")

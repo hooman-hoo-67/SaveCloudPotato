@@ -7,6 +7,7 @@ from __future__ import annotations
 import typer
 
 from savecloud.services.save import SaveService
+from savecloud.utils import output
 from savecloud.utils.output import require_game
 
 
@@ -22,6 +23,19 @@ def history(
     versions = SaveService.list_versions(
         game,
     )
+
+    if output.json_mode():
+
+        output.emit(
+            {
+                "ok": True,
+                "game_id": game.manifest.game_id,
+                "current_version": game.runtime.current_version,
+                "versions": versions,
+            }
+        )
+
+        return
 
     if not versions:
         typer.echo("No snapshots available.")

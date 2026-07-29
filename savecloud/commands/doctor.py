@@ -8,6 +8,7 @@ import typer
 
 from savecloud.models.diagnostic import Finding, Severity
 from savecloud.services.diagnostics import DiagnosticsService
+from savecloud.utils import output
 
 MARKERS = {
     Severity.OK: ("✓", typer.colors.GREEN),
@@ -63,6 +64,32 @@ def doctor(
 
     errors = [f for f in findings if f.severity is Severity.ERROR]
     warnings = [f for f in findings if f.severity is Severity.WARNING]
+
+    if output.json_mode():
+
+        output.emit(
+            {
+                "ok": not errors,
+                "errors": len(errors),
+                "warnings": len(warnings),
+                "findings": [
+                    {
+                        "severity": finding.severity.value,
+                        "title": finding.title,
+                        "detail": finding.detail,
+                        "remedy": finding.remedy,
+                    }
+                    for finding in (
+                        findings if verbose else [f for f in findings if f.is_problem]
+                    )
+                ],
+            }
+        )
+
+        if errors or (strict and warnings):
+            raise typer.Exit(code=1)
+
+        return
 
     typer.echo()
     typer.echo("SaveCloud Doctor")

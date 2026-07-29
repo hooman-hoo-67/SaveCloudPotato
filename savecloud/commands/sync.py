@@ -14,6 +14,7 @@ from savecloud.services.sync import (
     SyncConflictError,
     SyncService,
 )
+from savecloud.utils import output
 from savecloud.utils.output import (
     clear_progress,
     report_conflict,
@@ -54,12 +55,11 @@ def sync(
         return
 
     if not RegistryService.exists(game_id):
-        typer.secho(
-            f'Game "{game_id}" is not registered.',
-            fg=typer.colors.RED,
-        )
 
-        raise typer.Exit(code=1)
+        output.fail(
+            f'Game "{game_id}" is not registered.',
+            game_id=game_id,
+        )
 
     game = RegistryService.load_game(game_id)
 
@@ -71,6 +71,18 @@ def sync(
 
             clear_progress()
 
+            if output.json_mode():
+                output.emit(
+                    {
+                        "ok": True,
+                        "game_id": game_id,
+                        "action": action.value,
+                        "applied": False,
+                    }
+                )
+
+                return
+
             typer.echo(f"{game_id}: {action.value}")
 
             return
@@ -80,6 +92,19 @@ def sync(
     except SyncConflictError as error:
         clear_progress()
 
+        if output.json_mode():
+            output.emit(
+                {
+                    "ok": False,
+                    "game_id": game_id,
+                    "action": "conflict",
+                    "error": str(error),
+                    "resolutions": ["keep-local", "keep-remote"],
+                }
+            )
+
+            raise typer.Exit(code=1)
+
         report_conflict(error)
 
         raise typer.Exit(code=1)
@@ -87,14 +112,21 @@ def sync(
     except StorageUnavailableError as error:
         clear_progress()
 
-        typer.secho(
-            f"✗ {error}",
-            fg=typer.colors.RED,
-        )
-
-        raise typer.Exit(code=1)
+        output.fail(str(error), game_id=game_id, reason="storage-unavailable")
 
     clear_progress()
+
+    if output.json_mode():
+        output.emit(
+            {
+                "ok": True,
+                "game_id": game_id,
+                "action": action.value,
+                "applied": True,
+            }
+        )
+
+        return
 
     messages = {
         SyncAction.UPLOAD: "✓ Uploaded local save.",
@@ -119,22 +151,51 @@ def sync_all(
     games = RegistryService.list_games()
 
     if not games:
+
+        if output.json_mode():
+            output.emit({"ok": True, "games": []})
+
+            return
+
         typer.echo("No games are currently registered.")
         return
 
     if check:
+
+        checked = []
+
         for game in games:
 
             try:
                 action = SyncService.status(game)
 
-                typer.echo(f"{game.manifest.game_id}: {action.value}")
+                checked.append(
+                    {
+                        "game_id": game.manifest.game_id,
+                        "action": action.value,
+                    }
+                )
+
+                if not output.json_mode():
+                    typer.echo(f"{game.manifest.game_id}: {action.value}")
 
             except Exception as error:
-                typer.secho(
-                    f"{game.manifest.game_id}: {error}",
-                    fg=typer.colors.RED,
+
+                checked.append(
+                    {
+                        "game_id": game.manifest.game_id,
+                        "error": str(error),
+                    }
                 )
+
+                if not output.json_mode():
+                    typer.secho(
+                        f"{game.manifest.game_id}: {error}",
+                        fg=typer.colors.RED,
+                    )
+
+        if output.json_mode():
+            output.emit({"ok": True, "applied": False, "games": checked})
 
         return
 
@@ -145,23 +206,54 @@ def sync_all(
     clear_progress()
 
     if not results:
+
+        if output.json_mode():
+            output.emit({"ok": True, "applied": True, "games": []})
+
+            return
+
         typer.echo("No games have synchronization enabled.")
         return
 
     failures = 0
 
+    synced = []
+
     for game_id, outcome in results.items():
 
         if isinstance(outcome, SyncAction):
-            typer.echo(f"{game_id}: {outcome.value}")
+
+            synced.append({"game_id": game_id, "action": outcome.value})
+
+            if not output.json_mode():
+                typer.echo(f"{game_id}: {outcome.value}")
 
         else:
             failures += 1
 
-            typer.secho(
-                f"{game_id}: {outcome}",
-                fg=typer.colors.RED,
-            )
+            synced.append({"game_id": game_id, "error": str(outcome)})
+
+            if not output.json_mode():
+                typer.secho(
+                    f"{game_id}: {outcome}",
+                    fg=typer.colors.RED,
+                )
+
+    if output.json_mode():
+
+        output.emit(
+            {
+                "ok": failures == 0,
+                "applied": True,
+                "failures": failures,
+                "games": synced,
+            }
+        )
+
+        if failures:
+            raise typer.Exit(code=1)
+
+        return
 
     typer.echo()
 

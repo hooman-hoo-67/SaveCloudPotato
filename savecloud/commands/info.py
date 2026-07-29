@@ -8,6 +8,7 @@ from savecloud.services.configuration import ConfigurationService
 from savecloud.services.device import DeviceService
 from savecloud.services.library import SaveCloudLibrary
 from savecloud.services.registry import RegistryService
+from savecloud.utils import output
 
 
 def info(game_id: str) -> None:
@@ -16,11 +17,11 @@ def info(game_id: str) -> None:
     """
 
     if not RegistryService.exists(game_id):
-        typer.secho(
+
+        output.fail(
             f'Game "{game_id}" is not registered.',
-            fg=typer.colors.RED,
+            game_id=game_id,
         )
-        raise typer.Exit(code=1)
 
     game = RegistryService.load_game(game_id)
 
@@ -28,6 +29,54 @@ def info(game_id: str) -> None:
         SaveCloudLibrary.device_id(),
         game_id,
     )
+
+    if output.json_mode():
+
+        config = ConfigurationService.load()
+
+        output.emit(
+            {
+                "ok": True,
+                "game": {
+                    "game_id": game.manifest.game_id,
+                    "display_name": game.manifest.display_name,
+                    "launch_type": game.manifest.launch_type.value,
+                    "platform": game.manifest.platform.value,
+                    "adapter": game.manifest.adapter,
+                    "sync_enabled": game.manifest.sync_enabled,
+                    "backup_enabled": game.manifest.backup_enabled,
+                },
+                "storage": {
+                    "backend": config.storage_backend,
+                    "root": str(config.storage_root),
+                    "version_retention": config.version_retention,
+                },
+                "runtime": {
+                    "status": game.runtime.status.value,
+                    "pending_upload": game.runtime.pending_upload,
+                    "current_version": game.runtime.current_version,
+                    "last_device": game.runtime.last_device,
+                    "last_sync": game.runtime.last_sync,
+                    "last_launch": game.runtime.last_launch,
+                    "last_exit": game.runtime.last_exit,
+                    "last_exit_code": game.runtime.last_exit_code,
+                    "last_error": game.runtime.last_error,
+                    "last_sync_checksum": game.runtime.last_sync_checksum,
+                },
+                "device": None
+                if profile is None
+                else {
+                    "device_id": profile.device_id,
+                    "device_name": profile.device_name,
+                    "working_save_path": str(profile.working_save_path),
+                    "launch_command": profile.launch_command,
+                    "launcher": profile.launcher,
+                    "enabled": profile.enabled,
+                },
+            }
+        )
+
+        return
 
     typer.echo("Game Information")
     typer.echo("----------------")
