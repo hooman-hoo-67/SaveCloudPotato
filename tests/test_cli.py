@@ -159,7 +159,7 @@ def test_config_backend_changes_the_backend():
 
 def test_config_backend_rejects_an_unknown_backend():
 
-    result = invoke("config", "backend", "dropbox")
+    result = invoke("config", "backend", "nonexistent-provider")
 
     assert result.exit_code == 1
     assert "Unknown storage backend" in result.output

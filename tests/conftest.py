@@ -44,6 +44,15 @@ def installation(tmp_path, monkeypatch):
 
     SaveCloudLibrary.initialize()
 
+    #
+    # The Dropbox backend caches an authenticated client on the class,
+    # so it must not survive between tests.
+    #
+
+    from savecloud.storage.dropbox import DropboxStorageBackend
+
+    DropboxStorageBackend.reset()
+
     ConfigurationService.save(
         InstallationConfig(
             storage_backend="local",

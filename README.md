@@ -17,11 +17,9 @@ It works the same regardless of where a game came from.
 
 ## Current Status
 
-Milestones 1-10 complete. Desktop ↔ Steam Deck synchronization works
-today over a shared folder or Syncthing, and games can be launched
-from Steam.
-
-Cloud storage providers are next.
+Milestones 1-11 complete. Desktop ↔ Steam Deck synchronization works
+today over a shared folder, Syncthing, or Dropbox, and games can be
+launched from Steam.
 
 ## How it works
 
@@ -49,7 +47,7 @@ own library, and that library is what travels between devices.
                   │
         ┌─────────┴──────────┐
         │                    │
-    Syncthing            Local folder
+  Syncthing  Dropbox  Local folder
         │                    │
         └─────────┬──────────┘
                   ▼
@@ -113,6 +111,20 @@ For Proton games, register with the `steam-proton` adapter: it finds
 the Proton prefix from the App ID and offers the save directories
 inside it.
 
+## Cloud storage
+
+Dropbox works as a backend. Set it up once per device:
+
+```bash
+savecloud config provider dropbox     # authorize, one time
+savecloud config backend dropbox
+savecloud config root SaveCloud       # folder name inside Dropbox
+```
+
+Credentials are stored in `providers/dropbox.json` with owner-only
+permissions and are never synchronized, so each device authorizes
+separately.
+
 ## Adding a second device
 
 Nothing is registered twice. The game's configuration travels with its
@@ -151,7 +163,7 @@ reversible.
 | Command | Purpose |
 |---------|---------|
 | `init` | Create the installation |
-| `config` | Storage backend and root |
+| `config` | Storage backend, root, and provider credentials |
 | `register` / `unregister` | Manage games |
 | `list` / `info` | Inspect games |
 | `play` | Sync, launch, capture, upload |

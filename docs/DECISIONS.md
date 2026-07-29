@@ -506,3 +506,112 @@ Status
 
 Accepted. Reconsider only if Steam gains a supported way to set launch
 options, or if a read-only check turns out to be worth its machinery.
+
+---
+
+## 2026-07-29
+
+### Provider credentials never leave the device that holds them
+
+Decision
+
+Credentials live in `providers/<name>.json`, written with owner-only
+permissions, in the part of the SaveCloud home that is never
+synchronized. Each device authorizes separately.
+
+Reason
+
+The registry and library are synchronized precisely so a second device
+needs no setup. Extending that to credentials would be the obvious
+convenience and the wrong one: a refresh token grants full access to
+someone's cloud storage, and replicating it means every device, and
+every backup of every device, holds a copy. Losing one device would
+mean revoking access everywhere.
+
+Setting up a new device costs one authorization. That is a small price
+for a secret that does not travel.
+
+Status
+
+Accepted
+
+---
+
+### Dropbox authenticates with a refresh token, not an access token
+
+Decision
+
+Setup exchanges a one-time authorization code for a refresh token,
+which is what gets stored. Access tokens are obtained from it as
+needed and cached in memory for the process lifetime.
+
+Reason
+
+Dropbox access tokens expire after about four hours. Storing one would
+mean synchronization silently stopping partway through the same day,
+with an authentication error that looks like a bug rather than an
+expiry. Refresh tokens do not expire unless revoked.
+
+This is why the authorization URL must carry
+`token_access_type=offline`. Without it Dropbox returns only a
+short-lived token, so setup checks for the refresh token explicitly and
+fails with that explanation rather than storing something that will
+stop working.
+
+Status
+
+Accepted
+
+---
+
+### A backend prepares itself
+
+Decision
+
+`BaseStorageBackend.requires_setup()` and `setup()` join
+`provider_warnings()` as extension points. `savecloud config provider`
+calls them without knowing which provider it is talking to, and the
+Dropbox setup walkthrough lives beside the Dropbox backend.
+
+Reason
+
+The alternative is a command that grows a branch per provider, which is
+what the framework layer exists to prevent. Setup is provider
+knowledge, so it belongs with the provider - the same reasoning that
+put conflict-file detection in the Syncthing backend rather than in
+diagnostics.
+
+The consequence is that a storage module imports typer, which the
+dependency rules would otherwise discourage. That is accepted
+deliberately: setup is inherently interactive, and the alternative
+puts provider knowledge in the command layer, which is worse.
+
+Status
+
+Accepted
+
+---
+
+### storage_root names a folder, not a path, for Dropbox
+
+Decision
+
+For Dropbox, only the last component of `storage_root` is used, giving
+a folder at the root of the app's Dropbox space.
+
+Reason
+
+`storage_root` is a filesystem path for the local and Syncthing
+backends. Someone switching an existing installation to Dropbox
+carries over a value like `/home/you/SaveCloudRemote`, and using it
+verbatim would build a chain of empty folders inside Dropbox mirroring
+their home directory.
+
+Taking the final component means switching backends does something
+sensible without a separate setting, and `config root SaveCloud`
+reads naturally.
+
+Status
+
+Accepted. Revisit if a provider ever needs genuinely nested remote
+paths.

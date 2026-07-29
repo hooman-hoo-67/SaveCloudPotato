@@ -8,6 +8,7 @@ conditionals, so adding a provider never requires editing a service.
 from __future__ import annotations
 
 from savecloud.storage.base import BaseStorageBackend
+from savecloud.storage.dropbox import DropboxStorageBackend
 from savecloud.storage.local import LocalStorageBackend
 from savecloud.storage.syncthing import SyncthingStorageBackend
 
@@ -18,6 +19,7 @@ class StorageRegistry:
     """
 
     _BACKENDS: dict[str, type[BaseStorageBackend]] = {
+        "dropbox": DropboxStorageBackend,
         "local": LocalStorageBackend,
         "syncthing": SyncthingStorageBackend,
     }

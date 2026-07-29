@@ -145,6 +145,31 @@ class BaseStorageBackend(ABC):
         raise NotImplementedError
 
     @classmethod
+    def requires_setup(cls) -> bool:
+        """
+        Return whether this backend needs credentials before use.
+
+        A directory-shaped backend needs nothing beyond a path. A cloud
+        provider needs authorizing once per device.
+        """
+
+        return False
+
+    @classmethod
+    def setup(cls) -> None:
+        """
+        Interactively prepare this backend for use.
+
+        Called by `config provider`, which does not know which provider
+        it is talking to. A backend that needs no setup inherits this
+        and is simply never asked.
+        """
+
+        raise NotImplementedError(
+            f"{cls.display_name()} needs no setup.",
+        )
+
+    @classmethod
     def provider_warnings(cls) -> list[str]:
         """
         Report problems specific to this provider.

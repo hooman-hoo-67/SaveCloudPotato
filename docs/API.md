@@ -40,6 +40,17 @@ Show or change the directory the storage backend uses.
 savecloud config root ~/Sync/SaveCloud
 ```
 
+### `savecloud config provider [NAME]`
+
+Set up credentials for a storage backend. Defaults to the active one.
+
+```
+savecloud config provider dropbox
+```
+
+Backends that need no credentials say so and do nothing. Each device
+needs its own setup, because credentials are never synchronized.
+
 ### `savecloud config validate`
 
 Verify the configured backend is usable. Exits non-zero if not, which
@@ -255,3 +266,17 @@ uploads it.
 |----------|--------|
 | `SAVECLOUD_HOME` | Override the installation directory |
 | `SAVECLOUD_STEAM_ROOT` | Override Steam's location |
+
+---
+
+## Storage Backends
+
+| Backend | Needs setup | Notes |
+|---------|-------------|-------|
+| `local` | No | A directory on this machine or a mounted drive |
+| `syncthing` | No | A folder Syncthing replicates; refuses one it does not manage |
+| `dropbox` | Yes | `savecloud config provider dropbox` |
+
+For Dropbox, `config root` names a folder inside Dropbox rather
+than a local path. Only the last component is used, so a root of
+`~/SaveCloudRemote` becomes `/SaveCloudRemote` in Dropbox.

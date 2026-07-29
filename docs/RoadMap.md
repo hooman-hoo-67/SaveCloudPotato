@@ -14,7 +14,7 @@
 | 8 | Installation Configuration | ✓ |
 | 9 | Filesystem Synchronization | ✓ |
 | 10 | Steam Integration | ✓ |
-| 11 | Cloud Providers | ☐ |
+| 11 | Cloud Providers | ◐ |
 
 ---
 
@@ -66,12 +66,16 @@ mangohud and an Eden AppImage, with the save captured on exit. See
 
 ### Milestone 11 - Cloud Providers
 
+- [x] Dropbox
 - [ ] Google Drive
-- [ ] Dropbox
 - [ ] Nextcloud / WebDAV
 
-Builds on the existing backend interface. None should require changes
-to `SyncService`.
+Dropbox is implemented and covered by tests against an in-memory fake,
+including two devices sharing one account. It has not yet run against
+the real Dropbox API.
+
+It required no change to `SyncService`, which was the point of the
+storage framework.
 
 ### Not planned
 

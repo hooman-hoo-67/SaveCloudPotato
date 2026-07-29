@@ -154,6 +154,43 @@ def root(
     )
 
 
+@app.command("provider")
+def provider(
+    name: str = typer.Argument(
+        None,
+        help="Backend to set up. Defaults to the active one.",
+    ),
+) -> None:
+    """
+    Set up credentials for a storage backend.
+    """
+
+    if name is None:
+        name = ConfigurationService.load().storage_backend
+
+    backend = StorageRegistry.get(name)
+
+    if backend is None:
+        typer.secho(
+            f'Unknown storage backend: "{name}".',
+            fg=typer.colors.RED,
+        )
+
+        typer.echo(f"Available backends: {', '.join(StorageRegistry.names())}")
+
+        raise typer.Exit(code=1)
+
+    if not backend.requires_setup():
+        typer.echo(
+            f"{backend.display_name()} needs no credentials. "
+            f"Configure it with `savecloud config root <path>`."
+        )
+
+        return
+
+    backend.setup()
+
+
 @app.command("validate")
 def validate() -> None:
     """

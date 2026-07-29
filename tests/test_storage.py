@@ -46,8 +46,9 @@ def test_registry_lookup():
     assert backend_exists("local")
     assert backend_exists("syncthing")
     assert get_backend("local") is LocalStorageBackend
-    assert not backend_exists("dropbox")
-    assert get_backend("dropbox") is None
+    assert backend_exists("dropbox")
+    assert not backend_exists("nonexistent-provider")
+    assert get_backend("nonexistent-provider") is None
 
 
 def test_registry_lookup_is_case_insensitive():
@@ -57,7 +58,7 @@ def test_registry_lookup_is_case_insensitive():
 
 def test_registry_names():
 
-    assert StorageRegistry.names() == ["local", "syncthing"]
+    assert StorageRegistry.names() == ["dropbox", "local", "syncthing"]
 
 
 def test_a_new_backend_needs_no_service_changes():

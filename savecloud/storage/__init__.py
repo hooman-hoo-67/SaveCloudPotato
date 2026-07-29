@@ -3,6 +3,7 @@ SaveCloud storage framework.
 """
 
 from savecloud.storage.base import BaseStorageBackend
+from savecloud.storage.dropbox import DropboxStorageBackend
 from savecloud.storage.filesystem import FilesystemStorageBackend
 from savecloud.storage.local import LocalStorageBackend
 from savecloud.storage.registry import (
@@ -15,6 +16,7 @@ from savecloud.storage.syncthing import SyncthingStorageBackend
 
 __all__ = (
     "BaseStorageBackend",
+    "DropboxStorageBackend",
     "FilesystemStorageBackend",
     "LocalStorageBackend",
     "SUPPORTED_BACKENDS",

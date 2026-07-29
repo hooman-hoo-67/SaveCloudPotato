@@ -122,13 +122,13 @@ def test_an_unregistered_backend_is_an_error():
     from savecloud.models.installation_config import InstallationConfig
 
     ConfigurationService.save(
-        InstallationConfig(storage_backend="dropbox"),
+        InstallationConfig(storage_backend="nonexistent-provider"),
     )
 
     finding = find(DiagnosticsService.run(), "Storage backend")
 
     assert finding.severity is Severity.ERROR
-    assert "dropbox" in finding.detail
+    assert "nonexistent-provider" in finding.detail
 
 
 def test_an_unavailable_backend_is_an_error():

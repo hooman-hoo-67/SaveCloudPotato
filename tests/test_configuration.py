@@ -91,7 +91,7 @@ def test_set_backend_persists():
 def test_set_backend_rejects_unknown_backend():
 
     with pytest.raises(ValueError):
-        ConfigurationService.set_backend("dropbox")
+        ConfigurationService.set_backend("nonexistent-provider")
 
     assert ConfigurationService.load().storage_backend == "local"
 
