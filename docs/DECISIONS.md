@@ -664,6 +664,59 @@ Accepted
 
 ---
 
+## Proton asks two questions, not one
+
+Date: 2026-07-29
+
+Context
+
+Registering a Proton game through the interface meant typing a Steam
+App ID into a text field. The adapter already knew better - its CLI
+prompt lists installed games and then offers the plausible save
+folders inside the prefix - but none of that was reachable from a
+window, because `prompt_identifier()` is interactive terminal code.
+
+Decision
+
+Choosing the `steam-proton` adapter replaces the identifier field with
+two controls: which installed game, and which folder inside its
+prefix.
+
+Both come from Steam's own files - `libraryfolders.vdf` for what is
+installed, `compatdata/<app-id>/pfx` for the prefix. Nothing needs
+Steam to be running, and no account or API is involved.
+
+The save folder is offered rather than decided. Windows games use
+AppData/Roaming, Documents/My Games, Saved Games, and plenty of
+inventions of their own; silently synchronizing the wrong directory is
+worse than one more question. The field is editable and has a Browse
+button that opens inside the prefix, because a guess can be wrong.
+
+Consequences
+
+The recorded identifier is `<app-id>:<path relative to the prefix
+user directory>`. Steam moves prefixes between libraries when a game
+changes drive, so an absolute path would not survive it.
+
+A folder outside the prefix is refused. It would be a mistake this
+could have caught, and synchronizing the wrong tree is exactly the
+failure the adapter exists to avoid.
+
+A game with no prefix is reported as needing to be launched once,
+rather than as an error. That is what a game that has been installed
+and never played looks like.
+
+Found while building: a combo box owns its own line edit, and moving
+that into the shared directory row took it out of the combo box, which
+then rendered empty with the field on the line below. Browse is a
+separate helper for that case.
+
+Status
+
+Accepted
+
+---
+
 ## A downloaded AppImage is not an installed program
 
 Date: 2026-07-29

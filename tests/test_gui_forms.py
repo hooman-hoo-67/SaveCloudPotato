@@ -90,9 +90,9 @@ def test_the_identifier_label_follows_the_adapter(qt_app):
 
     assert dialog.identifier_label.text() == "Save Folder"
 
-    dialog.adapter.setCurrentText("steam-proton")
+    dialog.adapter.setCurrentText("eden")
 
-    assert dialog.identifier_label.text() == "Steam App ID"
+    assert dialog.identifier_label.text() == "Title ID"
 
 
 def test_the_default_adapter_takes_a_folder(qt_app):
@@ -582,6 +582,33 @@ def test_an_adapter_that_says_nothing_gets_a_plain_field():
     from savecloud.adapters.base import BaseAdapter
 
     assert BaseAdapter.identifier_is_path() is False
+
+
+def test_proton_replaces_the_identifier_with_a_game_picker(qt_app):
+    """
+    An App ID typed by hand is a worse question than a list of the
+    games actually installed.
+    """
+
+    from savecloud.gui.dialogs import RegisterDialog
+
+    dialog = RegisterDialog()
+
+    dialog.show()
+
+    dialog.adapter.setCurrentText("steam-proton")
+
+    assert dialog.steam_game.isHidden() is False
+
+    assert dialog.identifier.isHidden() is True
+
+    dialog.adapter.setCurrentText("manual")
+
+    assert dialog.steam_game.isHidden() is True
+
+    assert dialog.identifier.isHidden() is False
+
+    dialog.close()
 
 
 def test_browse_is_offered_only_for_a_path(qt_app):

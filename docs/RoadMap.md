@@ -113,6 +113,17 @@ on tagged pushes, since a Windows binary cannot be produced on Linux.
 An AppImage stays where it is put, which a virtual environment does
 not - so Steam launch options written against one keep working.
 
+### Proton
+
+- [x] prefix discovery from an App ID
+- [x] game picker and save folder picker in the interface
+- [ ] verified against a real Proton game
+
+The prefix is found; the save inside it is offered rather than
+guessed, because Windows games follow no convention. Tested against a
+constructed Steam library - a real game has not been registered
+through it yet.
+
 ### Not planned
 
 - non-Steam shortcut creation (`shortcuts.vdf`)

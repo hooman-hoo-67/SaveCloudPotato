@@ -118,9 +118,18 @@ class _Form(QDialog):
         raise NotImplementedError
 
 
-def _directory_row(field: QLineEdit, parent: QWidget) -> QWidget:
+def _directory_row(
+    field: QLineEdit,
+    parent: QWidget,
+    start_in=None,
+) -> QWidget:
     """
     A text field with a Browse button beside it.
+
+    ``start_in`` is called for a directory to open at when the field is
+    empty - which is how browsing for a Proton save starts inside the
+    game's prefix rather than in the home directory, several levels and
+    one hidden folder away.
     """
 
     row = QWidget(parent)
@@ -163,6 +172,9 @@ def _directory_row(field: QLineEdit, parent: QWidget) -> QWidget:
 
         current = field.text().strip()
 
+        if not current and start_in is not None:
+            current = start_in() or ""
+
         if current:
 
             start = Path(current).expanduser()
@@ -196,6 +208,62 @@ def _directory_row(field: QLineEdit, parent: QWidget) -> QWidget:
     row.browse_button = button
 
     return row
+
+
+def _browse_into(
+    setter,
+    parent: QWidget,
+    current,
+    start_in=None,
+) -> QPushButton:
+    """
+    A Browse button that writes the chosen directory back.
+
+    Separate from `_directory_row` because a combo box owns its own
+    line edit: moving that into another layout takes it out of the
+    combo box, which then shows nothing.
+    """
+
+    button = QPushButton("Browse…")
+
+    def browse() -> None:
+
+        dialog = QFileDialog(parent, "Select a folder")
+
+        dialog.setFileMode(QFileDialog.FileMode.Directory)
+
+        dialog.setOption(QFileDialog.Option.ShowDirsOnly, True)
+
+        dialog.setOption(QFileDialog.Option.DontUseNativeDialog, True)
+
+        dialog.setFilter(dialog.filter() | QDir.Filter.Hidden)
+
+        start = (current() or "").strip()
+
+        if not start and start_in is not None:
+            start = start_in() or ""
+
+        if start:
+
+            path = Path(start).expanduser()
+
+            if not path.is_dir():
+                path = path.parent
+
+            if path.is_dir():
+                dialog.setDirectory(str(path))
+
+        if dialog.exec() != ACCEPTED:
+            return
+
+        chosen = dialog.selectedFiles()
+
+        if chosen:
+            setter(chosen[0])
+
+    button.clicked.connect(browse)
+
+    return button
 
 
 class RegisterDialog(_Form):
@@ -258,9 +326,65 @@ class RegisterDialog(_Form):
 
         self.identifier_label = QLabel()
 
-        self.identifier_row = _directory_row(self.identifier, self)
+        self.identifier_row = _directory_row(
+            self.identifier,
+            self,
+            start_in=self._prefix_root,
+        )
 
         self.form.addRow(self.identifier_label, self.identifier_row)
+
+        #
+        # Proton asks two questions instead of one: which game, and
+        # where inside its prefix the save lives. A Windows game
+        # follows no convention, so the second cannot be inferred.
+        #
+
+        self.steam_game = QComboBox()
+
+        self._steam_games = facade.steam_games()
+
+        for game in self._steam_games:
+            self.steam_game.addItem(game.label, game.app_id)
+
+        if not self._steam_games:
+            self.steam_game.addItem("No Steam games found", "")
+
+        self.steam_game.currentIndexChanged.connect(self._steam_game_changed)
+
+        self.steam_game_label = QLabel("Steam game")
+
+        self.form.addRow(self.steam_game_label, self.steam_game)
+
+        #
+        # Editable, so a guess can be chosen from the list or a path
+        # typed or browsed for. One control, three ways in.
+        #
+
+        self.save_folder = QComboBox()
+
+        self.save_folder.setEditable(True)
+
+        self.save_folder_label = QLabel("Save folder")
+
+        self.save_folder_row = QWidget(self)
+
+        save_layout = QHBoxLayout(self.save_folder_row)
+
+        save_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.save_folder_browse = _browse_into(
+            self.save_folder.setCurrentText,
+            self,
+            self.save_folder.currentText,
+            start_in=self._prefix_root,
+        )
+
+        save_layout.addWidget(self.save_folder, 1)
+
+        save_layout.addWidget(self.save_folder_browse)
+
+        self.form.addRow(self.save_folder_label, self.save_folder_row)
 
         self.form.addRow("Launcher", self.launcher)
 
@@ -294,6 +418,25 @@ class RegisterDialog(_Form):
         Ask for what this adapter actually wants.
         """
 
+        proton = adapter == "steam-proton"
+
+        for widget in (
+            self.steam_game,
+            self.steam_game_label,
+            self.save_folder_label,
+            self.save_folder_row,
+        ):
+            widget.setVisible(proton)
+
+        for widget in (self.identifier, self.identifier_label,
+                       self.identifier_row):
+            widget.setVisible(not proton)
+
+        if proton:
+            self._steam_game_changed()
+
+            return
+
         choice = self._adapters.get(adapter)
 
         if choice is None:
@@ -309,6 +452,63 @@ class RegisterDialog(_Form):
 
         self.identifier.setPlaceholderText(
             "" if choice.identifier_is_path else choice.identifier_name
+        )
+
+    def _selected_app_id(self) -> str:
+        """
+        The Steam game currently chosen, if any.
+        """
+
+        return self.steam_game.currentData() or ""
+
+    def _prefix_root(self) -> str:
+        """
+        Where browsing for this game's save should start.
+        """
+
+        app_id = self._selected_app_id()
+
+        return self.facade.prefix_root(app_id) if app_id else ""
+
+    def _steam_game_changed(self, *_) -> None:
+        """
+        Offer whatever looks like a save directory in this prefix.
+
+        Reported rather than chosen between: Windows games follow no
+        convention, and silently synchronizing the wrong directory is
+        worse than one more question.
+        """
+
+        app_id = self._selected_app_id()
+
+        self.save_folder.clear()
+
+        if not app_id:
+            self.message.setText("No installed Steam games were found.")
+
+            return
+
+        if not self.facade.prefix_root(app_id):
+            self.message.setText(
+                "That game has no Proton prefix yet. Launch it once "
+                "through Steam, then reopen this window."
+            )
+
+            return
+
+        candidates = self.facade.save_candidates(app_id)
+
+        self.save_folder.addItems(candidates)
+
+        self.save_folder.setCurrentText(candidates[0] if candidates else "")
+
+        self.message.setText(
+            f"{len(candidates)} folder(s) in this prefix look like saves. "
+            f"Pick one, or browse for it - Windows games follow no "
+            f"convention, so this is a guess."
+            if candidates
+            else "Nothing in this prefix looks like a save yet. Play the "
+            "game once so it writes one, then browse for it."
         )
 
     def _suggest_game_id(self, name: str) -> None:
@@ -332,13 +532,30 @@ class RegisterDialog(_Form):
 
     def attempt(self):
 
+        adapter = self.adapter.currentText()
+
+        if adapter == "steam-proton":
+
+            built = self.facade.steam_identifier(
+                self._selected_app_id(),
+                self.save_folder.currentText(),
+            )
+
+            if not built.ok:
+                return built
+
+            identifier = built.value
+
+        else:
+            identifier = self.identifier.text()
+
         return self.facade.register(
             game_id=self.game_id.text(),
             display_name=self.display_name.text(),
             launch_type=self.launch_type.currentText(),
             platform=self.platform.currentText(),
-            adapter=self.adapter.currentText(),
-            identifier=self.identifier.text(),
+            adapter=adapter,
+            identifier=identifier,
             launcher=self.launcher.currentText(),
             launch_command=self.launch_command.text(),
         )

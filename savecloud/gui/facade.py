@@ -95,6 +95,20 @@ class Options:
 
 
 @dataclass(slots=True)
+class SteamGame:
+    """
+    An installed Steam game, as a picker offers it.
+    """
+
+    app_id: str
+    name: str
+
+    @property
+    def label(self) -> str:
+        return f"{self.name}  ({self.app_id})"
+
+
+@dataclass(slots=True)
 class Settings:
     """
     Installation-wide configuration, as a form shows it.
@@ -615,6 +629,117 @@ class GuiFacade:
             launch_types=[member.value for member in LaunchType],
             platforms=[member.value for member in Platform],
             backends=backends,
+        )
+
+    # ------------------------------------------------------------------
+    # Proton
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def steam_games() -> list[SteamGame]:
+        """
+        Every Steam game installed on this device.
+
+        Read from Steam's own library files, so nothing has to be
+        running and no account is involved.
+        """
+
+        from savecloud.utils import steam
+
+        games = [
+            SteamGame(app_id=app_id, name=name)
+            for app_id, name in steam.installed_apps().items()
+        ]
+
+        return sorted(games, key=lambda game: game.name.lower())
+
+    @staticmethod
+    def prefix_root(app_id: str) -> str:
+        """
+        The Windows user directory inside a game's Proton prefix.
+
+        Empty when the game has no prefix yet, which is what a game
+        that has never been launched looks like.
+        """
+
+        from savecloud.utils import steam
+
+        directory = steam.prefix_user_directory(app_id)
+
+        return "" if directory is None else str(directory)
+
+    @staticmethod
+    def save_candidates(app_id: str) -> list[str]:
+        """
+        Plausible save directories inside a game's prefix.
+
+        Reported rather than chosen between. Windows games follow no
+        convention, and silently synchronizing the wrong directory is
+        worse than one more question.
+        """
+
+        from savecloud.utils import steam
+
+        return [str(path) for path in steam.candidate_save_directories(app_id)]
+
+    @staticmethod
+    def steam_identifier(app_id: str, folder: str) -> Outcome:
+        """
+        Build the identifier that records a Proton save location.
+
+        `<app-id>:<path relative to the prefix user directory>`, so the
+        location survives Steam moving the prefix between libraries -
+        which it does when a game is moved to another drive.
+        """
+
+        from savecloud.utils import steam
+
+        app_id = app_id.strip()
+
+        if not app_id:
+            return Outcome(ok=False, message="Choose a game.")
+
+        if not folder.strip():
+            return Outcome(ok=False, message="Choose the save folder.")
+
+        root = steam.prefix_user_directory(app_id)
+
+        if root is None:
+            return Outcome(
+                ok=False,
+                message=(
+                    "That game has no Proton prefix yet. Launch it once "
+                    "through Steam, then try again."
+                ),
+            )
+
+        chosen = Path(folder.strip()).expanduser()
+
+        if not chosen.is_dir():
+            return Outcome(ok=False, message=f"{chosen} is not a directory.")
+
+        try:
+            relative = chosen.resolve().relative_to(root.resolve())
+
+        except ValueError:
+            return Outcome(
+                ok=False,
+                message=(
+                    f"That folder is outside the game's prefix. Saves "
+                    f"have to live under {root}."
+                ),
+            )
+
+        #
+        # The user directory itself is a valid answer for a game that
+        # writes straight into it.
+        #
+
+        suffix = relative.as_posix()
+
+        return Outcome(
+            ok=True,
+            value=app_id if suffix == "." else f"{app_id}:{suffix}",
         )
 
     @staticmethod
