@@ -376,7 +376,7 @@ class RegisterDialog(_Form):
         self.save_folder_browse = _browse_into(
             self.save_folder.setCurrentText,
             self,
-            self.save_folder.currentText,
+            self._selected_save_folder,
             start_in=self._prefix_root,
         )
 
@@ -461,6 +461,24 @@ class RegisterDialog(_Form):
 
         return self.steam_game.currentData() or ""
 
+    def _selected_save_folder(self) -> str:
+        """
+        The chosen save folder.
+
+        The combo box holds a readable label against the real path, but
+        it is editable - so a typed or browsed path arrives as text
+        with no data behind it.
+        """
+
+        path = self.save_folder.currentData()
+
+        if path and self.save_folder.currentText() == self.save_folder.itemText(
+            self.save_folder.currentIndex()
+        ):
+            return path
+
+        return self.save_folder.currentText()
+
     def _prefix_root(self) -> str:
         """
         Where browsing for this game's save should start.
@@ -498,14 +516,21 @@ class RegisterDialog(_Form):
 
         candidates = self.facade.save_candidates(app_id)
 
-        self.save_folder.addItems(candidates)
+        #
+        # The label is what a person can compare; the path is what the
+        # form submits.
+        #
 
-        self.save_folder.setCurrentText(candidates[0] if candidates else "")
+        for candidate in candidates:
+            self.save_folder.addItem(candidate.label, candidate.path)
+
+        if candidates:
+            self.save_folder.setCurrentIndex(0)
 
         self.message.setText(
-            f"{len(candidates)} folder(s) in this prefix look like saves. "
-            f"Pick one, or browse for it - Windows games follow no "
-            f"convention, so this is a guess."
+            f"{len(candidates)} folder(s) in this prefix could hold the "
+            f"save, newest first. Windows games follow no convention, so "
+            f"check this is the right one - browse if it is not."
             if candidates
             else "Nothing in this prefix looks like a save yet. Play the "
             "game once so it writes one, then browse for it."
@@ -538,7 +563,7 @@ class RegisterDialog(_Form):
 
             built = self.facade.steam_identifier(
                 self._selected_app_id(),
-                self.save_folder.currentText(),
+                self._selected_save_folder(),
             )
 
             if not built.ok:

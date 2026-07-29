@@ -117,12 +117,16 @@ not - so Steam launch options written against one keep working.
 
 - [x] prefix discovery from an App ID
 - [x] game picker and save folder picker in the interface
-- [ ] verified against a real Proton game
+- [x] verified against a real Proton game
+- [ ] Proton saves shared between two devices
 
 The prefix is found; the save inside it is offered rather than
-guessed, because Windows games follow no convention. Tested against a
-constructed Steam library - a real game has not been registered
-through it yet.
+guessed, because Windows games follow no convention. AppData/Roaming,
+AppData/Local, AppData/LocalLow, Documents/My Games, Documents and
+Saved Games are all scanned, ordered by how recently each was written.
+
+Verified against a real Proton game on a BC250. Cross-device
+compatibility of a Proton save has not been tested.
 
 ### Not planned
 

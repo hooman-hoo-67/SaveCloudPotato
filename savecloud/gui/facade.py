@@ -109,6 +109,34 @@ class SteamGame:
 
 
 @dataclass(slots=True)
+class SaveCandidate:
+    """
+    A folder inside a Proton prefix that might hold the save.
+    """
+
+    path: str
+
+    #
+    # What to show. The absolute path runs to about ninety characters
+    # of prefix nobody needs to read, and comparing two of them means
+    # comparing their last few segments anyway.
+    #
+
+    relative: str
+
+    modified: str
+    empty: bool
+
+    @property
+    def label(self) -> str:
+
+        if self.empty:
+            return f"{self.relative}  (empty)"
+
+        return f"{self.relative}  (written {self.modified})"
+
+
+@dataclass(slots=True)
 class Settings:
     """
     Installation-wide configuration, as a form shows it.
@@ -669,18 +697,48 @@ class GuiFacade:
         return "" if directory is None else str(directory)
 
     @staticmethod
-    def save_candidates(app_id: str) -> list[str]:
+    def save_candidates(app_id: str) -> list[SaveCandidate]:
         """
         Plausible save directories inside a game's prefix.
 
         Reported rather than chosen between. Windows games follow no
         convention, and silently synchronizing the wrong directory is
-        worse than one more question.
+        worse than one more question - so each carries when it was last
+        written, which is what actually distinguishes the save from the
+        empty folders beside it.
         """
+
+        from datetime import datetime
 
         from savecloud.utils import steam
 
-        return [str(path) for path in steam.candidate_save_directories(app_id)]
+        root = steam.prefix_user_directory(app_id)
+
+        if root is None:
+            return []
+
+        candidates = []
+
+        for path in steam.candidate_save_directories(app_id):
+
+            written = steam.last_written(path)
+
+            candidates.append(
+                SaveCandidate(
+                    path=str(path),
+                    relative=str(path.relative_to(root)),
+                    modified=(
+                        ""
+                        if not written
+                        else datetime.fromtimestamp(written).strftime(
+                            "%Y-%m-%d %H:%M"
+                        )
+                    ),
+                    empty=not written,
+                )
+            )
+
+        return candidates
 
     @staticmethod
     def steam_identifier(app_id: str, folder: str) -> Outcome:

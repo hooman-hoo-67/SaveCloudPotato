@@ -123,11 +123,90 @@ def test_plausible_save_folders_are_offered(steam):
 
     assert len(candidates) == 2
 
-    assert any("AppData/Roaming/Resident Evil 4" in path for path in candidates)
+    relative = {candidate.relative for candidate in candidates}
 
-    assert any(
-        "Documents/My Games/Resident Evil 4" in path for path in candidates
+    assert "AppData/Roaming/Resident Evil 4" in relative
+
+    assert "Documents/My Games/Resident Evil 4" in relative
+
+
+def test_candidates_are_labelled_by_their_place_in_the_prefix(steam):
+    """
+    An absolute path here runs to about ninety characters of prefix
+    nobody needs to read.
+    """
+
+    candidate = GuiFacade.save_candidates("2050650")[0]
+
+    assert candidate.relative in candidate.label
+
+    assert "drive_c" not in candidate.label
+
+
+def test_the_newest_folder_is_offered_first(steam):
+    """
+    A game that has just been played has touched its save, which is a
+    better guess than the order these locations happen to be listed
+    in.
+    """
+
+    import os
+    import time
+
+    root = steam / "steamapps" / "compatdata" / "2050650" / "pfx"
+
+    user = root / "drive_c" / "users" / "steamuser"
+
+    stale = user / "AppData" / "Roaming" / "Resident Evil 4" / "old.sav"
+
+    fresh = user / "Documents" / "My Games" / "Resident Evil 4" / "new.sav"
+
+    stale.write_text("old")
+
+    fresh.write_text("new")
+
+    old = time.time() - 60 * 60 * 24 * 30
+
+    os.utime(stale, (old, old))
+
+    candidates = GuiFacade.save_candidates("2050650")
+
+    assert candidates[0].relative == "Documents/My Games/Resident Evil 4"
+
+
+def test_an_empty_folder_is_offered_last(steam):
+    """
+    A game leaves these behind on first launch, before there is
+    anything to save.
+    """
+
+    user = (
+        steam
+        / "steamapps"
+        / "compatdata"
+        / "2050650"
+        / "pfx"
+        / "drive_c"
+        / "users"
+        / "steamuser"
     )
+
+    (user / "AppData" / "Roaming" / "Resident Evil 4" / "save.bin").write_text("x")
+
+    candidates = GuiFacade.save_candidates("2050650")
+
+    assert candidates[0].empty is False
+
+    assert candidates[-1].empty is True
+
+
+def test_an_empty_folder_says_so(steam):
+
+    candidates = GuiFacade.save_candidates("2050650")
+
+    assert all(candidate.empty for candidate in candidates)
+
+    assert "(empty)" in candidates[0].label
 
 
 def test_a_container_is_not_offered_as_a_save(steam):
@@ -138,7 +217,9 @@ def test_a_container_is_not_offered_as_a_save(steam):
 
     candidates = GuiFacade.save_candidates("2050650")
 
-    assert not any(path.endswith("/Documents") for path in candidates)
+    assert not any(
+        candidate.relative == "Documents" for candidate in candidates
+    )
 
 
 #
@@ -152,9 +233,13 @@ def test_the_identifier_is_relative_to_the_prefix(steam):
     so an absolute path would not survive it.
     """
 
-    folder = GuiFacade.save_candidates("2050650")[0]
+    folder = next(
+        candidate
+        for candidate in GuiFacade.save_candidates("2050650")
+        if candidate.relative.startswith("AppData/Roaming")
+    )
 
-    outcome = GuiFacade.steam_identifier("2050650", folder)
+    outcome = GuiFacade.steam_identifier("2050650", folder.path)
 
     assert outcome.ok is True
 
@@ -165,13 +250,13 @@ def test_the_identifier_round_trips_through_the_adapter(steam):
 
     folder = GuiFacade.save_candidates("2050650")[0]
 
-    identifier = GuiFacade.steam_identifier("2050650", folder).value
+    identifier = GuiFacade.steam_identifier("2050650", folder.path).value
 
     located = GuiFacade.locate_save("steam-proton", identifier)
 
     assert located.ok is True
 
-    assert located.value == folder
+    assert located.value == folder.path
 
 
 def test_the_prefix_root_itself_is_allowed(steam):

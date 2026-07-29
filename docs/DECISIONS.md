@@ -687,10 +687,23 @@ installed, `compatdata/<app-id>/pfx` for the prefix. Nothing needs
 Steam to be running, and no account or API is involved.
 
 The save folder is offered rather than decided. Windows games use
-AppData/Roaming, Documents/My Games, Saved Games, and plenty of
-inventions of their own; silently synchronizing the wrong directory is
-worse than one more question. The field is editable and has a Browse
-button that opens inside the prefix, because a guess can be wrong.
+AppData/Roaming, AppData/Local, AppData/LocalLow, Documents/My Games,
+Saved Games, and plenty of inventions of their own; all are scanned,
+and silently synchronizing the wrong directory is worse than one more
+question. The field is editable and has a Browse button that opens
+inside the prefix, because a guess can be wrong.
+
+Candidates are ordered by how recently something inside was written,
+with empty folders last. Ordering them by the list of locations
+instead meant AppData/Roaming was always preselected - which looks
+like a recommendation while being nothing more than which line came
+first. A game that has just been played has touched its save, and
+folders left empty on first launch are exactly the ones to rank down.
+
+Each is labelled by its place in the prefix and when it was last
+written, because an absolute path here is ninety characters of prefix
+nobody needs to read, and "written yesterday" against "empty" is what
+actually distinguishes the save from the folders beside it.
 
 Consequences
 

@@ -238,6 +238,16 @@ def prefix_user_directory(app_id: str) -> Path | None:
     return None
 
 
+#
+# How far into a candidate to look when judging it. A save directory
+# is small; a directory holding thousands of files is something else,
+# and walking all of it to find that out would be the expensive way to
+# learn nothing.
+#
+
+CANDIDATE_SCAN_LIMIT = 200
+
+
 def candidate_save_directories(app_id: str) -> list[Path]:
     """
     Return plausible save directories inside an application's prefix.
@@ -245,6 +255,12 @@ def candidate_save_directories(app_id: str) -> list[Path]:
     Windows games have no single convention, so this reports what
     exists rather than guessing which one is correct. The caller is
     expected to let the user choose.
+
+    Ordered by how recently something inside was written. A game that
+    has just been played has touched its save, so the newest directory
+    is the best guess available - and a better one than the order
+    these locations happen to be listed in, which is what "first in
+    the list" would otherwise mean.
     """
 
     user_directory = prefix_user_directory(app_id)
@@ -284,7 +300,56 @@ def candidate_save_directories(app_id: str) -> list[Path]:
 
             candidates.append(child)
 
-    return candidates
+    #
+    # Empty directories sort last however new they are: a game leaves
+    # them behind on first launch, before there is anything to save.
+    #
+
+    return sorted(
+        candidates,
+        key=lambda path: (0, 0.0) if is_empty(path) else (1, last_written(path)),
+        reverse=True,
+    )
+
+
+def is_empty(directory: Path) -> bool:
+    """
+    Return whether a directory holds no files at any depth.
+    """
+
+    return last_written(directory) == 0.0
+
+
+def last_written(directory: Path) -> float:
+    """
+    Return when a file inside a directory was most recently written.
+
+    Zero when it holds no files. Directory timestamps are ignored:
+    they move when anything is created beside the save, which makes an
+    untouched folder look freshly used.
+    """
+
+    newest = 0.0
+
+    seen = 0
+
+    for path in directory.rglob("*"):
+
+        if seen >= CANDIDATE_SCAN_LIMIT:
+            break
+
+        try:
+            if not path.is_file():
+                continue
+
+            seen += 1
+
+            newest = max(newest, path.stat().st_mtime)
+
+        except OSError:
+            continue
+
+    return newest
 
 
 def is_steam_deck() -> bool:
