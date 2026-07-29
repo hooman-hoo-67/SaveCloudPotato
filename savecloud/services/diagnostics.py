@@ -430,6 +430,31 @@ class DiagnosticsService:
 
             return findings
 
+        #
+        # No launch command is a choice, not a fault. A game started
+        # from Steam is started by Steam; SaveCloud only needs one to
+        # run the game itself.
+        #
+
+        if not profile.launch_command.strip():
+            findings.append(
+                Finding(
+                    severity=Severity.OK,
+                    title="Launched through Steam",
+                    detail=(
+                        "No launch command is set, so this game is "
+                        "started by Steam rather than by SaveCloud."
+                    ),
+                    remedy=(
+                        f"Steam launch options:\n"
+                        f"savecloud wrap {game_id} -- %command%"
+                    ),
+                    game_id=game_id,
+                )
+            )
+
+            return findings
+
         if not launcher.validate(profile.launch_command):
             findings.append(
                 Finding(

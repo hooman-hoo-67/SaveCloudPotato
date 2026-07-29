@@ -138,6 +138,11 @@ Register a game interactively. Prompts for a display name, game ID,
 launch type, platform, adapter, launcher, and launch command, then
 locates and validates the save directory through the chosen adapter.
 
+The launch command is optional. A game started from Steam is started
+by Steam, which hands SaveCloud the real command through `wrap` - only
+`savecloud play` needs one, and it names the alternative if it is
+missing.
+
 Storage backend is not asked for. It is installation-wide.
 
 ### `savecloud unregister GAME_ID`

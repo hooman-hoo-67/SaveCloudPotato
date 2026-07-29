@@ -122,7 +122,7 @@ class DeviceService:
             device_name=data["device_name"],
             game_id=data["game_id"],
             working_save_path=Path(data["working_save_path"]),
-            launch_command=data["launch_command"],
+            launch_command=data.get("launch_command", ""),
             launcher=data.get(
                 "launcher",
                 "native",

@@ -20,7 +20,7 @@ from savecloud.services.registry import RegistryService
 from savecloud.services.save import SaveService
 from savecloud.services.sync import StorageUnavailableError, SyncService
 from savecloud.utils import output
-from savecloud.utils.prompt import choose_option, prompt_required
+from savecloud.utils.prompt import choose_option
 
 def list_remote(remote: list[str]) -> None:
     """
@@ -195,7 +195,11 @@ def pair(
         "Select launcher",
     )
 
-    launch_command = prompt_required("Launch command")
+    launch_command = typer.prompt(
+        "Launch command (optional, only needed for `savecloud play`)",
+        default="",
+        show_default=False,
+    ).strip()
 
     profile = DeviceProfile(
         device_id=device_id,

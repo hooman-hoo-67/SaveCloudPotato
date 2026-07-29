@@ -46,8 +46,13 @@ class DeviceProfile:
     #
     # Launch information
     #
+    # Optional. A game launched through Steam is started by Steam,
+    # which hands SaveCloud the real command through `wrap` - so most
+    # games never need one. It is only `savecloud play`, which starts
+    # the game itself, that cannot work without it.
+    #
 
-    launch_command: str
+    launch_command: str = ""
     launcher: str = "native"
     #
     # Local synchronization state

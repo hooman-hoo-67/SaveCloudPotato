@@ -85,7 +85,16 @@ def register() -> None:
         "Select launcher",
     )
 
-    launch_command = prompt_required("Launch command")
+    #
+    # Optional. A game launched from Steam is started by Steam, which
+    # hands SaveCloud the real command through `wrap`.
+    #
+
+    launch_command = typer.prompt(
+        "Launch command (optional, only needed for `savecloud play`)",
+        default="",
+        show_default=False,
+    ).strip()
 
     manifest = GameManifest(
         game_id=game_id,

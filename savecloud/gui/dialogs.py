@@ -17,6 +17,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QDir
 from PySide6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -263,7 +264,17 @@ class RegisterDialog(_Form):
 
         self.form.addRow("Launcher", self.launcher)
 
+        self.launch_command.setPlaceholderText(
+            "optional - only needed for savecloud play"
+        )
+
         self.form.addRow("Launch command", self.launch_command)
+
+        self.message.setText(
+            "A game launched from Steam does not need a launch command. "
+            "SaveCloud gives you a line to paste into its Launch "
+            "Options once it is registered."
+        )
 
         #
         # A game ID nobody typed is worse than one derived from the
@@ -357,6 +368,10 @@ class PairDialog(_Form):
         self.launcher.addItems(options.launchers)
 
         self.launch_command = QLineEdit()
+
+        self.launch_command.setPlaceholderText(
+            "optional - only needed for savecloud play"
+        )
 
         self.form.addRow("Game in storage", self.game)
 
@@ -485,7 +500,13 @@ class GameSettingsDialog(_Form):
 
         self.form.addRow("Launcher", self.launcher)
 
+        self.launch_command.setPlaceholderText(
+            "optional - only needed for savecloud play"
+        )
+
         self.form.addRow("Launch command", self.launch_command)
+
+        self.form.addRow("Steam launch options", self._launch_options_row())
 
         if not detail.paired:
 
@@ -497,6 +518,46 @@ class GameSettingsDialog(_Form):
                 widget.setEnabled(False)
 
             self.message.setText("This game is not set up on this device.")
+
+    def _launch_options_row(self) -> QWidget:
+        """
+        The line to paste into Steam, and a button that copies it.
+
+        Read-only: it is derived from the game ID, so editing it would
+        only produce a line that does not work.
+        """
+
+        row = QWidget(self)
+
+        layout = QHBoxLayout(row)
+
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        options = self.facade.steam_launch_options(self.detail.game_id)
+
+        field = QLineEdit(options)
+
+        field.setReadOnly(True)
+
+        button = QPushButton("Copy")
+
+        def copy() -> None:
+
+            QApplication.clipboard().setText(options)
+
+            self.complain("Copied to the clipboard.")
+
+        button.clicked.connect(copy)
+
+        layout.addWidget(field)
+
+        layout.addWidget(button)
+
+        self.launch_options_field = field
+
+        self.copy_button = button
+
+        return row
 
     def attempt(self):
 

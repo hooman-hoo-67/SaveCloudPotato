@@ -664,6 +664,49 @@ Accepted
 
 ---
 
+## A launch command is optional
+
+Date: 2026-07-29
+
+Context
+
+Registration required a launch command, and writing one is fiddly -
+quoting an AppImage path and a ROM path correctly, by hand, before
+anything can be registered.
+
+It buys almost nothing. `savecloud play` is the only thing that uses
+it, and `play` is not how these games get started: Steam is. Steam
+runs `savecloud wrap`, hands over the real invocation as `%command%`,
+and SaveCloud never has to know how to launch anything.
+
+Decision
+
+`DeviceProfile.launch_command` defaults to empty, and nothing requires
+it. What the interface offers instead is the line to paste into
+Steam - shown in the detail pane, in the game's settings with a Copy
+button, and in a dialog the moment a game is registered, which is when
+someone is about to go and add it to Steam anyway.
+
+Consequences
+
+`play` refuses without one, and names `wrap` when it does. Refusing is
+right; refusing without saying what to do instead is not.
+
+`doctor` reports a missing command as OK rather than a warning, with
+the Steam line as its remedy. It is a configuration, not a fault.
+
+Profiles written before this load with an empty command rather than
+raising, since the key simply will not be there.
+
+The line is read-only wherever it is shown. It is derived from the
+game ID, so editing it could only produce one that does not work.
+
+Status
+
+Accepted
+
+---
+
 ## Forms validate in place
 
 Date: 2026-07-29

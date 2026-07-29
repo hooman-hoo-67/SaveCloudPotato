@@ -176,7 +176,11 @@ def test_a_missing_save_folder_is_refused(qt_app):
     assert "No save directory" in dialog.message.text()
 
 
-def test_a_missing_launch_command_is_refused(qt_app, save_folder):
+def test_a_missing_launch_command_is_allowed(qt_app, save_folder):
+    """
+    A game started from Steam is started by Steam. Only `savecloud
+    play`, which starts the game itself, needs a command.
+    """
 
     from savecloud.gui.dialogs import ACCEPTED, RegisterDialog
 
@@ -188,9 +192,9 @@ def test_a_missing_launch_command_is_refused(qt_app, save_folder):
 
     dialog.submit()
 
-    assert dialog.result() != ACCEPTED
+    assert dialog.result() == ACCEPTED
 
-    assert "Launch command" in dialog.message.text()
+    assert GuiFacade.detail("nameless").launch_command == ""
 
 
 #
@@ -706,3 +710,147 @@ def test_pairing_asks_specifically_once_the_game_is_known(
     dialog = PairDialog([GAME_ID])
 
     assert dialog.identifier_label.text() == "Save Folder"
+
+
+#
+# Launch commands are optional
+#
+# A game started from Steam is started by Steam, which hands SaveCloud
+# the real command through `wrap`. Only `savecloud play` needs one.
+#
+
+
+def test_the_steam_launch_options_are_offered_verbatim(registered_game):
+
+    assert GuiFacade.steam_launch_options(GAME_ID) == (
+        f"savecloud wrap {GAME_ID} -- %command%"
+    )
+
+
+def test_a_game_without_a_launch_command_still_synchronizes(
+    registered_game,
+    working_save,
+):
+    """
+    The whole point: registering without one costs nothing that
+    matters.
+    """
+
+    from savecloud.services.sync import SyncService
+    from savecloud.storage import LocalStorageBackend
+    from tests.conftest import read_save
+
+    GuiFacade.update_profile(GAME_ID, str(working_save), "native", "")
+
+    write_save(working_save, "progress")
+
+    assert GuiFacade.sync(GAME_ID).ok is True
+
+    assert read_save(
+        LocalStorageBackend.current_directory(GAME_ID)
+    ) == "progress"
+
+    assert SyncService.status(RegistryService.load_game(GAME_ID))
+
+
+def test_playing_without_a_launch_command_says_what_to_do(
+    registered_game,
+    working_save,
+):
+    """
+    Refusing is right; refusing without naming the alternative is not.
+    """
+
+    GuiFacade.update_profile(GAME_ID, str(working_save), "native", "")
+
+    outcome = GuiFacade.play(GAME_ID)
+
+    assert outcome.ok is False
+
+    assert "savecloud wrap" in outcome.message
+
+
+def test_a_profile_written_without_the_field_still_loads(registered_game):
+    """
+    Older installations have no launch_command in their profiles.
+    """
+
+    import json
+
+    from savecloud.services.device import DeviceService
+    from savecloud.services.library import SaveCloudLibrary
+
+    device_id = SaveCloudLibrary.device_id()
+
+    path = DeviceService.profile_path(device_id, GAME_ID)
+
+    data = json.loads(path.read_text())
+
+    del data["launch_command"]
+
+    path.write_text(json.dumps(data))
+
+    assert DeviceService.load_profile(device_id, GAME_ID).launch_command == ""
+
+
+def test_diagnostics_treat_a_missing_command_as_a_choice(
+    registered_game,
+    working_save,
+):
+    """
+    Not a fault. It should not make `doctor` report a problem.
+    """
+
+    GuiFacade.update_profile(GAME_ID, str(working_save), "native", "")
+
+    findings = GuiFacade.diagnostics()
+
+    launched = [
+        finding for finding in findings if "Steam" in finding.title
+    ]
+
+    assert launched
+
+    assert all(not finding.is_problem for finding in launched)
+
+    assert any("wrap" in finding.remedy for finding in launched)
+
+
+def test_the_settings_dialog_offers_the_line_to_copy(qt_app, registered_game):
+
+    from savecloud.gui.dialogs import GameSettingsDialog
+
+    dialog = GameSettingsDialog(GuiFacade.detail(GAME_ID))
+
+    assert dialog.launch_options_field.text() == (
+        f"savecloud wrap {GAME_ID} -- %command%"
+    )
+
+    assert dialog.launch_options_field.isReadOnly() is True
+
+
+def test_copying_puts_it_on_the_clipboard(qt_app, registered_game):
+
+    from PySide6.QtWidgets import QApplication
+    from savecloud.gui.dialogs import GameSettingsDialog
+
+    dialog = GameSettingsDialog(GuiFacade.detail(GAME_ID))
+
+    dialog.copy_button.click()
+
+    assert QApplication.clipboard().text() == (
+        f"savecloud wrap {GAME_ID} -- %command%"
+    )
+
+
+def test_the_detail_pane_shows_the_line(qt_app, registered_game):
+
+    from savecloud.gui.window import MainWindow
+
+    window = MainWindow()
+
+    window.games.list.setCurrentRow(0)
+
+    assert f"savecloud wrap {GAME_ID} -- %command%" in (
+        window.detail.toPlainText()
+    )

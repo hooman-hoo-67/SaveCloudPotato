@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QHBoxLayout,
     QInputDialog,
@@ -191,7 +192,10 @@ class DetailPane(QTextEdit):
                 "",
                 f"Launcher         {detail.launcher}",
                 f"Working save     {detail.working_save_path}",
-                f"Launch command   {detail.launch_command}",
+                f"Launch command   {detail.launch_command or '(none - launched by Steam)'}",
+                "",
+                "Steam launch options",
+                f"  {GuiFacade.steam_launch_options(detail.game_id)}",
             ]
 
         lines += ["", f"Versions kept    {len(detail.versions)}"]
@@ -664,6 +668,42 @@ class MainWindow(QMainWindow):
 
         self.statusBar().showMessage(dialog.outcome.message, 8000)
 
+        self._offer_launch_options(dialog.outcome.game_id)
+
+    def _offer_launch_options(self, game_id: str) -> None:
+        """
+        Hand over the line Steam needs, at the moment it is needed.
+
+        Registering a game is exactly when someone is about to go and
+        add it to Steam, and the alternative is finding this in a
+        detail pane they have no reason to read yet.
+        """
+
+        options = self.facade.steam_launch_options(game_id)
+
+        box = QMessageBox(self)
+
+        box.setWindowTitle("Add to Steam")
+
+        box.setText(
+            "Put this in the game's Launch Options in Steam, and "
+            "SaveCloud will synchronize around every session:"
+        )
+
+        box.setInformativeText(options)
+
+        copy = box.addButton("Copy", QMessageBox.ActionRole)
+
+        box.addButton("Close", QMessageBox.RejectRole)
+
+        box.exec()
+
+        if box.clickedButton() is copy:
+
+            QApplication.clipboard().setText(options)
+
+            self.statusBar().showMessage("Copied to the clipboard.", 5000)
+
     def _pair(self) -> None:
         """
         Adopt a game storage already holds.
@@ -698,6 +738,8 @@ class MainWindow(QMainWindow):
         self.games.select(dialog.outcome.game_id)
 
         self.statusBar().showMessage(dialog.outcome.message, 8000)
+
+        self._offer_launch_options(dialog.outcome.game_id)
 
     def _game_settings(self) -> None:
         """

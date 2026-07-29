@@ -707,9 +707,6 @@ class GuiFacade:
         if not located.ok:
             return located
 
-        if not launch_command.strip():
-            return Outcome(ok=False, message="Launch command is required.")
-
         try:
             game = Game(
                 manifest=GameManifest(
@@ -745,6 +742,20 @@ class GuiFacade:
             game_id=game_id,
             message=f"Registered {display_name.strip()}.",
         )
+
+    @staticmethod
+    def steam_launch_options(game_id: str) -> str:
+        """
+        What to paste into a game's Launch Options in Steam.
+
+        Steam replaces `%command%` with the whole real invocation,
+        Proton included, so this one line works for a native game and
+        a Windows one alike. It is the ordinary way to use SaveCloud -
+        a launch command is only needed by `savecloud play`, which
+        starts the game itself.
+        """
+
+        return f"savecloud wrap {game_id} -- %command%"
 
     @staticmethod
     def adapter_for(game_id: str) -> AdapterChoice | None:
@@ -822,9 +833,6 @@ class GuiFacade:
 
         if not located.ok:
             return located
-
-        if not launch_command.strip():
-            return Outcome(ok=False, message="Launch command is required.")
 
         try:
             DeviceService.create_profile(
@@ -916,9 +924,6 @@ class GuiFacade:
                 game_id=game_id,
                 message=f"{path} is not a directory.",
             )
-
-        if not launch_command.strip():
-            return Outcome(ok=False, message="Launch command is required.")
 
         profile = DeviceService.load_profile(device_id, game_id)
 

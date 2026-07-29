@@ -47,6 +47,14 @@ class LaunchService:
                 f"Available launchers: {', '.join(LauncherRegistry.names())}.",
             )
 
+        if not profile.launch_command.strip():
+            raise ValueError(
+                f'"{profile.game_id}" has no launch command on this '
+                f"device, so SaveCloud cannot start it. Either set one, "
+                f"or launch it from Steam with:\n"
+                f"    savecloud wrap {profile.game_id} -- %command%",
+            )
+
         if not launcher.validate(
             profile.launch_command,
         ):
