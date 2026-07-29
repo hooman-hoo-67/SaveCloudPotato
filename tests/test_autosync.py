@@ -4,6 +4,8 @@ Tests for the automatic synchronization workflow.
 
 from __future__ import annotations
 
+import signal
+
 import pytest
 
 from savecloud.services.autosync import AutoSyncService
@@ -259,3 +261,197 @@ def test_sync_disabled_games_only_launch(tmp_path):
     assert result.uploaded is False
 
     assert not LocalStorageBackend.exists(GAME_ID)
+
+
+#
+# Exit classification
+#
+# A game closed from Gaming Mode arrives as a signal death, not a
+# clean zero. Treating that as a crash would mean saves never publish
+# on a Steam Deck, where it is the usual way to close a game.
+#
+
+
+def test_a_crash_is_still_captured_locally(tmp_path):
+    """
+    A crash is when the session is least reproducible, so discarding
+    it is the worst available response.
+    """
+
+    working = tmp_path / "working"
+
+    write_save(working, "original")
+
+    game = register_game(working, launch_command="false")
+
+    SyncService.sync(RegistryService.load_game(GAME_ID))
+
+    write_save(working, "progress then crash")
+
+    AutoSyncService.play(RegistryService.load_game(GAME_ID))
+
+    assert read_save(SaveService.current_save(game)) == "progress then crash"
+
+
+def test_a_crash_leaves_the_save_pending(tmp_path):
+    """
+    Captured but unpublished, so an explicit sync still sends it.
+    """
+
+    working = tmp_path / "working"
+
+    write_save(working, "original")
+
+    register_game(working, launch_command="false")
+
+    SyncService.sync(RegistryService.load_game(GAME_ID))
+
+    write_save(working, "progress then crash")
+
+    AutoSyncService.play(RegistryService.load_game(GAME_ID))
+
+    runtime = RegistryService.load_runtime(GAME_ID)
+
+    assert runtime.pending_upload is True
+
+    assert "exited with code 1" in (runtime.last_error or "")
+
+    #
+    # The player decides the save is good; sync publishes it.
+    #
+
+    SyncService.sync(RegistryService.load_game(GAME_ID))
+
+    assert read_save(
+        LocalStorageBackend.current_directory(GAME_ID)
+    ) == "progress then crash"
+
+
+def test_a_crash_warns_how_to_publish_the_save(tmp_path):
+
+    working = tmp_path / "working"
+
+    write_save(working, "original")
+
+    game = register_game(working, launch_command="false")
+
+    result = AutoSyncService.play(game)
+
+    assert any("savecloud sync" in warning for warning in result.warnings)
+
+
+def test_termination_counts_as_an_ordinary_exit():
+    """
+    Steam's Stop button and Gaming Mode's Exit Game both send SIGTERM.
+    """
+
+    from savecloud.services.autosync import _is_ordinary_exit
+
+    assert _is_ordinary_exit(0) is True
+
+    assert _is_ordinary_exit(-int(signal.SIGTERM)) is True
+    assert _is_ordinary_exit(-int(signal.SIGINT)) is True
+
+    assert _is_ordinary_exit(1) is False
+    assert _is_ordinary_exit(-int(signal.SIGSEGV)) is False
+
+
+def test_a_terminated_game_is_uploaded(tmp_path):
+    """
+    The Gaming Mode case: closed by SIGTERM, and the save must publish.
+    """
+
+    working = tmp_path / "working"
+
+    write_save(working, "original")
+
+    register_game(working, launch_command="true")
+
+    SyncService.sync(RegistryService.load_game(GAME_ID))
+
+    write_save(working, "played in gaming mode")
+
+    from savecloud.services.autosync import PlayResult
+
+    result = PlayResult(exit_code=0)
+
+    AutoSyncService.after_exit(
+        RegistryService.load_game(GAME_ID),
+        -int(signal.SIGTERM),
+        result,
+    )
+
+    assert result.uploaded is True
+
+    assert read_save(
+        LocalStorageBackend.current_directory(GAME_ID)
+    ) == "played in gaming mode"
+
+
+def test_signal_handlers_are_restored_after_a_launch(tmp_path):
+    """
+    The wrapper must not leave the process's signal disposition
+    changed once the game has exited.
+    """
+
+    working = tmp_path / "working"
+
+    write_save(working, "original")
+
+    game = register_game(working, launch_command="true")
+
+    before = signal.getsignal(signal.SIGTERM)
+
+    AutoSyncService.play(game)
+
+    assert signal.getsignal(signal.SIGTERM) is before
+
+
+def test_a_shutdown_signal_reaches_the_game(tmp_path):
+    """
+    Steam signals SaveCloud, not the game. Without forwarding, the
+    game would keep running and the save would never be captured.
+    """
+
+    import subprocess
+    import sys
+    import time
+
+    working = tmp_path / "working"
+
+    write_save(working, "original")
+
+    marker = tmp_path / "handled.txt"
+
+    #
+    # A game that writes its save when asked to stop, as a real one
+    # flushes on shutdown.
+    #
+
+    script = (
+        "import signal, sys, time\n"
+        f"open({str(marker)!r}, 'w').write('flushed')\n"
+        "signal.signal(signal.SIGTERM, lambda *a: sys.exit(0))\n"
+        "time.sleep(30)\n"
+    )
+
+    process = subprocess.Popen([sys.executable, "-c", script])
+
+    for _ in range(100):
+        if marker.exists():
+            break
+        time.sleep(0.05)
+
+    import threading
+
+    def stop() -> None:
+        time.sleep(0.2)
+        process.send_signal(signal.SIGTERM)
+
+    threading.Thread(target=stop, daemon=True).start()
+
+    exit_code = AutoSyncService._wait_forwarding_signals(process)
+
+    assert exit_code == 0
+
+    assert marker.read_text() == "flushed"

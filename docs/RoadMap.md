@@ -14,7 +14,7 @@
 | 8 | Installation Configuration | ✓ |
 | 9 | Filesystem Synchronization | ✓ |
 | 10 | Steam Integration | ✓ |
-| 11 | Cloud Providers | ◐ |
+| 11 | Cloud Providers | ✓ |
 
 ---
 
@@ -70,9 +70,13 @@ mangohud and an Eden AppImage, with the save captured on exit. See
 - [ ] Google Drive
 - [ ] Nextcloud / WebDAV
 
-Dropbox is implemented and covered by tests against an in-memory fake,
-including two devices sharing one account. It has not yet run against
-the real Dropbox API.
+Dropbox is implemented, covered by tests against an in-memory fake,
+and accepted against the real API: a save uploaded from the BC250 was
+downloaded onto a Steam Deck through a Dropbox account shared by both,
+and edits made on either device reached the other.
+
+Google Drive and WebDAV stay open. Neither is needed for the app to
+work, and the storage framework means adding one changes no service.
 
 It required no change to `SyncService`, which was the point of the
 storage framework.

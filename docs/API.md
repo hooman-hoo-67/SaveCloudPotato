@@ -279,6 +279,22 @@ Unreachable storage does not prevent playing. The session is captured
 into the library and marked pending, and the next successful sync
 uploads it.
 
+Every session is captured whatever the exit code. A game closed by
+Steam's Stop button or Gaming Mode's Exit Game is terminated with
+SIGTERM, which counts as an ordinary exit and publishes normally. Any
+other non-zero exit is captured and marked pending but not published,
+so a crashed session cannot reach your other devices unasked:
+
+```
+! Game exited with code 1. The save was kept locally but not
+  uploaded; run `savecloud sync hollow-knight` to publish it.
+```
+
+`wrap` forwards those signals to the game rather than dying on them,
+so the game flushes its save and SaveCloud is still alive to capture
+it. SIGKILL cannot be survived; if Steam escalates, the session is
+lost.
+
 ---
 
 ## Exit Codes

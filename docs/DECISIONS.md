@@ -664,6 +664,69 @@ Accepted
 
 ---
 
+## A terminated game is not a crashed game
+
+Date: 2026-07-29
+
+Context
+
+`after_exit` treated any non-zero exit code as a crash, and a crash as
+a reason to publish nothing.
+
+Two things were wrong with that.
+
+The code returned before capturing, so a crashed session was not
+uploaded *and* not saved locally - it was discarded. The comment above
+it claimed the save was "captured locally but not pushed", which is
+what should have happened and not what the code did. A crash is when a
+session is least reproducible, so discarding it is the worst available
+response.
+
+Worse on a Steam Deck: `subprocess` reports a signal death as the
+negated signal number, and Gaming Mode's Exit Game sends SIGTERM. So
+an ordinary session arrived as -15, was classified as a crash, and its
+save was dropped. Reported from the field as "it downloads on launch
+but never uploads in Gaming Mode".
+
+Decision
+
+Capture always, publish selectively.
+
+Every session is captured into the library whatever the exit code. The
+library is versioned and retention bounds it, so a bad capture is
+recoverable and a missing one is not.
+
+SIGTERM and SIGINT count as ordinary exits and publish normally. They
+mean "stop now", which is how Steam's Stop button and Gaming Mode both
+close a game. Any other non-zero code captures, marks the save
+pending, and says which command publishes it once the player has
+decided the save is good.
+
+`wrap` also forwards those signals to the game rather than dying on
+them. Steam signals SaveCloud, not the game; Python's default action
+would have ended the wrapper immediately, so the save would never be
+captured - which is the entire reason the wrapper is in the way. The
+handler passes the signal on, the game flushes and exits, and
+SaveCloud is still alive to capture it.
+
+Consequences
+
+Handlers are installed around the wait and restored afterwards, so a
+launch does not leave the process's signal disposition changed.
+
+Installing them can fail off the main thread. That is tolerated rather
+than fatal: waiting unprotected is still better than refusing to
+launch.
+
+SIGKILL remains unsurvivable, by definition. If Steam escalates, the
+session is lost. Nothing in a wrapper can fix that.
+
+Status
+
+Accepted
+
+---
+
 ## Setting the retention window applies it
 
 Date: 2026-07-29

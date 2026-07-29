@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+import signal
 import subprocess
 
 from savecloud.launchers import LauncherRegistry
@@ -35,6 +36,32 @@ from savecloud.services.sync import (
     SyncConflictError,
     SyncService,
 )
+
+
+#
+# Signals that mean "stop now, please", as opposed to a crash. Steam's
+# Stop button and Gaming Mode's Exit Game both terminate a game this
+# way, so a session ended by one of these is an ordinary session and
+# its save deserves publishing.
+#
+
+SHUTDOWN_SIGNALS = (signal.SIGTERM, signal.SIGINT)
+
+
+def _is_ordinary_exit(exit_code: int) -> bool:
+    """
+    Return whether an exit code describes a normal end to a session.
+
+    `subprocess` reports a signal death as the negated signal number,
+    so a game closed from Gaming Mode arrives here as -15 rather than
+    0. Treating that as a crash would mean saves never publish on a
+    Steam Deck, where it is the usual way to close a game.
+    """
+
+    if exit_code == 0:
+        return True
+
+    return -exit_code in {int(number) for number in SHUTDOWN_SIGNALS}
 
 
 class UntrackableLaunchError(RuntimeError):
@@ -207,11 +234,66 @@ class AutoSyncService:
 
         process = subprocess.Popen(argv)
 
-        exit_code = process.wait()
+        exit_code = AutoSyncService._wait_forwarding_signals(process)
 
         AutoSyncService.after_exit(game, exit_code, result)
 
         return result
+
+    @staticmethod
+    def _wait_forwarding_signals(
+        process: subprocess.Popen,
+    ) -> int:
+        """
+        Wait for the game, passing shutdown signals on to it.
+
+        Steam terminates the process it launched, which is SaveCloud
+        rather than the game. Python's default action would end this
+        process immediately, so the save would never be captured -
+        which is the whole reason the wrapper is in the way.
+
+        Forwarding the signal instead lets the game shut down and flush
+        its save, and leaves SaveCloud alive to capture it.
+        """
+
+        def forward(number, frame) -> None:
+
+            try:
+                process.send_signal(number)
+
+            except ProcessLookupError:
+                #
+                # It exited between the signal and this handler.
+                #
+                pass
+
+        previous = {}
+
+        for number in SHUTDOWN_SIGNALS:
+
+            try:
+                previous[number] = signal.signal(number, forward)
+
+            except (ValueError, OSError):
+                #
+                # Only the main thread of the main interpreter can
+                # install handlers. Waiting unprotected is still
+                # better than refusing to launch.
+                #
+                pass
+
+        try:
+            return process.wait()
+
+        finally:
+
+            for number, handler in previous.items():
+
+                try:
+                    signal.signal(number, handler)
+
+                except (ValueError, OSError):
+                    pass
 
     # ------------------------------------------------------------------
     # Shared lifecycle
@@ -269,21 +351,6 @@ class AutoSyncService:
 
         RegistryService.update_runtime(game)
 
-        #
-        # A non-zero exit usually means the game crashed. Its save may
-        # be half-written, so it is captured locally but not pushed.
-        #
-
-        if exit_code != 0:
-
-            game.runtime.mark_error(
-                f"Game exited with code {exit_code}",
-            )
-
-            RegistryService.update_runtime(game)
-
-            return
-
         if not game.manifest.sync_enabled:
             return
 
@@ -291,6 +358,11 @@ class AutoSyncService:
         # Capture the session into the library before involving the
         # backend at all. Storage may be unreachable; the save must be
         # preserved regardless.
+        #
+        # Captured whatever the exit code. A crash is exactly when the
+        # session is least reproducible, so discarding it is the worst
+        # available response - and the library is versioned, so a bad
+        # capture is recoverable while a missing one is not.
         #
 
         try:
@@ -300,6 +372,29 @@ class AutoSyncService:
 
             result.warnings.append(
                 f"Could not capture the save into the library: {error}",
+            )
+
+            return
+
+        #
+        # An unusual exit is captured but not published, so a crashed
+        # session cannot propagate to other devices unasked. It is
+        # marked pending, so an explicit `savecloud sync` still sends
+        # it once the player has decided the save is good.
+        #
+
+        if not _is_ordinary_exit(exit_code):
+
+            game.runtime.mark_pending()
+
+            game.runtime.last_error = f"Game exited with code {exit_code}"
+
+            RegistryService.update_runtime(game)
+
+            result.warnings.append(
+                f"Game exited with code {exit_code}. The save was kept "
+                f"locally but not uploaded; run `savecloud sync "
+                f"{game.manifest.game_id}` to publish it.",
             )
 
             return
