@@ -21,8 +21,18 @@ dev = [
     "pyflakes"
 ]
 
+# The desktop interface. Optional so the CLI still installs on a
+# machine with no Qt - a headless server, or a Steam Deck running only
+# the Decky plugin.
+gui = [
+    "PySide6-Essentials>=6.6"
+]
+
 [project.scripts]
 savecloud = "savecloud.cli:app"
+
+[project.gui-scripts]
+savecloud-gui = "savecloud.gui.app:main"
 
 [tool.setuptools.packages.find]
 include = ["savecloud*"]

@@ -8,6 +8,7 @@ from savecloud.services.configuration import ConfigurationService
 from savecloud.services.device import DeviceService
 from savecloud.services.library import SaveCloudLibrary
 from savecloud.services.registry import RegistryService
+from savecloud.services.library import SaveCloudLibrary as _Library
 from savecloud.utils import output
 
 
@@ -63,7 +64,12 @@ def info(game_id: str) -> None:
                 "runtime": {
                     "status": game.runtime.status.value,
                     "pending_upload": game.runtime.pending_upload,
-                    "current_version": game.runtime.current_version,
+                    "latest_version": SaveCloudLibrary.load_library_metadata(
+                        game_id
+                    ).latest_version,
+                    "restored_from": SaveCloudLibrary.load_library_metadata(
+                        game_id
+                    ).current_version,
                     "last_device": game.runtime.last_device,
                     "last_sync": game.runtime.last_sync,
                     "last_launch": game.runtime.last_launch,
@@ -129,7 +135,17 @@ def info(game_id: str) -> None:
 
     typer.echo(f"Pending Upload  : {game.runtime.pending_upload}")
 
-    typer.echo(f"Current Version : {game.runtime.current_version}")
+    #
+    # From the library, which owns save data. The runtime's copy of
+    # this is written at registration and never updated.
+    #
+
+    metadata = _Library.load_library_metadata(game_id)
+
+    typer.echo(f"Latest Version  : {metadata.latest_version}")
+
+    if metadata.current_version:
+        typer.echo(f"Restored From   : version {metadata.current_version}")
 
     typer.echo()
 

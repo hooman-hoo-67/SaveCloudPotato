@@ -664,6 +664,73 @@ Accepted
 
 ---
 
+## The desktop interface imports services; the plugin will not
+
+Date: 2026-07-29
+
+Context
+
+Two front ends are planned. The desktop application is Python, so it
+can import SaveCloud directly. A Decky Loader plugin is React running
+under a different runtime, and cannot.
+
+Decision
+
+The desktop interface calls services in-process, through a facade.
+`--json` stays for front ends that cannot do that.
+
+Two integration paths sounds like the drift this was meant to avoid,
+but they meet at the service layer rather than diverging below it.
+Spawning a subprocess and parsing JSON to ask a question answerable by
+a function call in the same interpreter would buy nothing and cost a
+process launch per refresh.
+
+Widgets never import a service. `GuiFacade` returns plain dataclasses,
+so a view can be tested without an installation, and the questions the
+interface asks are visible in one file rather than scattered across
+windows.
+
+Consequences
+
+PySide6 is an optional dependency. The CLI installs and runs without
+Qt, which matters for a headless machine and for a Deck running only
+the plugin. `savecloud.gui.app` imports Qt inside `main()` so a missing
+install produces an instruction rather than a traceback.
+
+Anything that touches the network runs on a thread. Qt redraws nothing
+while a slot executes, so probing a cloud provider on the interface
+thread would freeze the window - the desktop equivalent of the silent
+minute progress reporting was added to explain.
+
+The first version is read-only. Threading, progress, and error
+rendering are exercised on something that cannot destroy a save before
+any button can.
+
+Findings while implementing
+
+`QThreadPool` deletes a runnable as soon as `run()` returns, taking its
+signals object with it, while queued deliveries to the interface
+thread may still be in flight. This segfaulted under test rather than
+failing. Workers now disable auto-deletion and are released after
+delivery instead.
+
+`GameRuntime.current_version` is written at registration and never
+updated - it reads 0 forever. `LibraryMetadata.latest_version` is the
+real number, and `current_version` there means something else again:
+which version the current save was restored from. `info` had been
+displaying the runtime's copy, so it always reported version 0. Both
+now read the library, which owns save data, and label the two numbers
+separately.
+
+`info` called `load_profile` unguarded, raising FileNotFoundError for
+a game registered but not paired on this device.
+
+Status
+
+Accepted
+
+---
+
 ## Automatic sync is a per-device switch
 
 Date: 2026-07-29

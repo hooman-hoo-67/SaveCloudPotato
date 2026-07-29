@@ -15,6 +15,7 @@
 | 9 | Filesystem Synchronization | ✓ |
 | 10 | Steam Integration | ✓ |
 | 11 | Cloud Providers | ✓ |
+| 12 | Desktop Interface | ◐ |
 
 ---
 
@@ -80,6 +81,21 @@ work, and the storage framework means adding one changes no service.
 
 It required no change to `SyncService`, which was the point of the
 storage framework.
+
+### Milestone 12 - Desktop Interface
+
+- [x] service facade and threading
+- [x] read-only viewer: games, state, history, health
+- [ ] sync, play, and conflict resolution
+- [ ] register and pair
+- [ ] AppImage and Windows packaging
+
+PySide6, importing services in-process. Optional: `pip install
+savecloud[gui]`, then `savecloud-gui`. The CLI runs without Qt.
+
+Read-only deliberately. The threading, progress, and error paths are
+exercised on something that cannot destroy a save before any button
+that could is added.
 
 ### Not planned
 
