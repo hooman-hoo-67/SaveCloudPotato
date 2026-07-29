@@ -630,6 +630,19 @@ class SettingsDialog(_Form):
 
         self.form.addRow("", self.credentials_button)
 
+        #
+        # Only shown for a downloaded build that is not yet reachable
+        # by name. A pip installation already is.
+        #
+
+        self.install_button = QPushButton("Add to PATH and menu")
+
+        self.install_button.clicked.connect(self._install)
+
+        self.install_button.setVisible(facade.needs_installing())
+
+        self.form.addRow("", self.install_button)
+
         self._backend_changed()
 
     def _selected_backend(self) -> str:
@@ -652,6 +665,17 @@ class SettingsDialog(_Form):
 
         else:
             self.message.setText("")
+
+    def _install(self) -> None:
+        """
+        Make `savecloud` reachable by name.
+        """
+
+        outcome = self.facade.install()
+
+        self.complain(outcome.message)
+
+        self.install_button.setVisible(self.facade.needs_installing())
 
     def _set_up_credentials(self) -> None:
 

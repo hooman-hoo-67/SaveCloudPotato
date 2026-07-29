@@ -16,16 +16,30 @@ chmod +x SaveCloud-x86_64.AppImage
 ./SaveCloud-x86_64.AppImage
 ```
 
+Keep it wherever you like - an AppImage is not installed anywhere, and
+the file you downloaded is the whole program.
+
+To type `savecloud` in a terminal and get a menu entry, run it once:
+
+```
+./SaveCloud-x86_64.AppImage install
+```
+
+That links `~/.local/bin/savecloud` to wherever the AppImage is, and
+adds a desktop entry. `install --remove` undoes it. The interface
+offers the same thing under Settings.
+
 One file is both the interface and the command line. Opened on its own
 it shows a window; given arguments it behaves like the CLI, which is
 what makes it usable in Steam launch options:
 
 ```
-/path/to/SaveCloud-x86_64.AppImage wrap hollow-knight -- %command%
+savecloud wrap hollow-knight -- %command%
 ```
 
-`savecloud doctor -v` prints the correct line for wherever it is
-installed.
+`savecloud doctor -v` prints the correct line for this machine. After
+`install` it names `~/.local/bin/savecloud`, which keeps working when
+the AppImage is replaced by a newer one.
 
 From source instead:
 

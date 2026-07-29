@@ -35,7 +35,12 @@ analysis = Analysis(
     [str(ROOT / "packaging" / "entry.py")],
     pathex=[str(ROOT)],
     binaries=[],
-    datas=[],
+    #
+    # The icon travels inside the bundle, so `savecloud install` can
+    # put it where the desktop looks without the AppImage being
+    # unpacked first.
+    #
+    datas=[(str(ROOT / "packaging" / "savecloud.png"), ".")],
     #
     # Commands and backends are reached through registries rather than
     # imported by name, so PyInstaller cannot see them.

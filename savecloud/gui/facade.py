@@ -744,6 +744,32 @@ class GuiFacade:
         )
 
     @staticmethod
+    def needs_installing() -> bool:
+        """
+        Return whether this build could be put on PATH and is not.
+
+        False for a `pip install`, which already is.
+        """
+
+        from savecloud.services import integration
+
+        return integration.is_packaged() and not integration.is_installed()
+
+    @staticmethod
+    def install() -> Outcome:
+        """
+        Put `savecloud` on PATH and add a menu entry.
+        """
+
+        from savecloud.services import integration
+
+        result = integration.install()
+
+        lines = [result.message] + result.warnings
+
+        return Outcome(ok=result.ok, message="\n\n".join(lines))
+
+    @staticmethod
     def steam_launch_options(game_id: str) -> str:
         """
         What to paste into a game's Launch Options in Steam.

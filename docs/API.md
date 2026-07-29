@@ -54,6 +54,28 @@ Safe to run repeatedly. If an installation predates Milestone 8 and its
 manifests all name the same storage backend, that value is adopted as
 the installation default.
 
+### `savecloud install`
+
+Put `savecloud` on PATH and add a menu entry, both pointing at
+wherever this build actually is.
+
+| Option | Effect |
+|--------|--------|
+| `--remove` | Undo it |
+
+Only for a downloaded AppImage. A `pip install` already puts the
+command on PATH, and says so rather than doing anything.
+
+Creates `~/.local/bin/savecloud` as a symlink, so replacing the
+AppImage updates the command too, plus a desktop entry and icon. It
+warns rather than fails if `~/.local/bin` is not on PATH.
+
+Steam launch options prefer this link once it exists, so they survive
+an update that a direct path to the AppImage would not.
+
+Removing takes away the ways of reaching SaveCloud, not SaveCloud:
+the AppImage and every save are left alone.
+
 ---
 
 ## Configuration

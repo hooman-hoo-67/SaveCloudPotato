@@ -111,7 +111,7 @@ def launch_options(game_id: str) -> str:
     alike.
     """
 
-    executable = savecloud_executable()
+    executable = _stable_path()
 
     #
     # A bare name is the honest fallback: without a resolved path
@@ -147,6 +147,36 @@ def _script_directories() -> list[Path]:
             seen.append(directory)
 
     return seen
+
+
+def _stable_path() -> Path | None:
+    """
+    The longest-lived way to reach this build.
+
+    Steam keeps launch options until they are edited by hand, so the
+    path written into them should outlive an update. A symlink in
+    `~/.local/bin` does: replacing the AppImage behind it leaves the
+    link, and the options, still correct.
+
+    Only trusted when it leads back here. A link left by some other
+    installation would send Steam somewhere unexpected.
+    """
+
+    executable = savecloud_executable()
+
+    if executable is None:
+        return None
+
+    link = Path.home() / ".local" / "bin" / NAME
+
+    try:
+        if link.is_symlink() and link.resolve() == executable.resolve():
+            return link
+
+    except OSError:
+        pass
+
+    return executable
 
 
 def _runnable(path: Path) -> bool:

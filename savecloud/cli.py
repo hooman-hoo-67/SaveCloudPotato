@@ -17,6 +17,7 @@ from savecloud.commands import (
     import_save,
     info,
     init,
+    install as install_command,
     list as list_command,
     pair,
     play,
@@ -62,6 +63,7 @@ def main(
 #
 
 app.command("init")(init.init)
+app.command("install")(install_command.install)
 
 #
 # Game management

@@ -664,6 +664,60 @@ Accepted
 
 ---
 
+## A downloaded AppImage is not an installed program
+
+Date: 2026-07-29
+
+Context
+
+An AppImage is a file that has been downloaded. It is called
+`SaveCloud-x86_64.AppImage`, it is wherever the browser put it, it is
+not on PATH, and nothing knows it exists.
+
+So `savecloud sync` in a terminal finds nothing, and the only way to
+open the interface is to find the file. For a beta that is the
+difference between something usable and something that technically
+works.
+
+Decision
+
+`savecloud install` links `~/.local/bin/savecloud` to wherever the
+build is, writes a desktop entry naming the real file, and installs
+the icon. `--remove` undoes it. The interface offers the same under
+Settings.
+
+Offered rather than performed. The AppImage works without any of it,
+and writing to someone's home directory because they opened a program
+is not a reasonable default.
+
+Consequences
+
+A symlink rather than a copy, so replacing the AppImage updates the
+command.
+
+Steam launch options prefer the link once it exists. Steam keeps them
+until they are edited by hand, so the path written in should outlive
+an update - which a direct path to a file named after its version does
+not. The link is only trusted when it leads back to this build; one
+left by another installation would send Steam somewhere unexpected.
+
+The desktop entry's `Exec` names the file rather than `savecloud`,
+because a desktop entry is read by things that do not share this
+process's PATH.
+
+`~/.local/bin` not being on PATH is a warning rather than a failure.
+The link is still correct, and saying so is better than refusing.
+
+Found while testing against the real artifact: the icon was never
+installed, because it was not among the bundle's data files. The
+command reported success and the menu entry had no icon.
+
+Status
+
+Accepted
+
+---
+
 ## One packaged file, two behaviours
 
 Date: 2026-07-29
