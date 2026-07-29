@@ -664,6 +664,57 @@ Accepted
 
 ---
 
+## Launch options name the executable by path
+
+Date: 2026-07-29
+
+Context
+
+The line offered for Steam was `savecloud wrap <game> -- %command%`,
+which assumes `savecloud` is on the PATH Steam runs with.
+
+For a pipx or system installation it is. For a virtual environment -
+the way SaveCloud is actually installed today - it is not: Steam is
+not started from a shell that activated anything. The bare name
+resolves to nothing, and the game fails to start with no explanation
+of why.
+
+Decision
+
+The line names the executable by absolute path, resolved on the device
+the options are being written for. That is the only device they will
+ever be pasted into, so there is nothing to make portable.
+
+Resolution tries, in order: how this process was started, the
+directory beside the running interpreter, `sys.prefix`, and finally
+PATH. A bare name remains the fallback when none of those find
+anything, which happens when SaveCloud is run as a module from a
+source checkout.
+
+Consequences
+
+`sys.executable` is deliberately not resolved. A virtual environment's
+`python` is usually a symlink to the system interpreter, and following
+it lands outside the environment - where SaveCloud is not installed.
+This was found by writing the check and watching it return the wrong
+answer.
+
+The path is shell-quoted. Steam splits the line, so a path containing
+a space would arrive as two arguments and nothing would run.
+
+`savecloud-gui` resolves to `savecloud` beside it, since the interface
+is a different script in the same directory.
+
+The line is computed rather than stored, so it stays correct if the
+installation moves - but launch options already pasted into Steam do
+not. Moving a virtual environment means pasting them again.
+
+Status
+
+Accepted
+
+---
+
 ## A launch command is optional
 
 Date: 2026-07-29

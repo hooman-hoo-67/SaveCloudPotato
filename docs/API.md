@@ -309,6 +309,12 @@ Steam replaces `%command%` with the full invocation, including the
 Proton runtime for a Windows game. SaveCloud synchronizes, runs it,
 waits for it to exit, and captures the save.
 
+Use the absolute path to `savecloud` unless it is on the PATH Steam
+itself runs with. A virtual environment's `bin` is not, so a bare name
+there resolves to nothing and the game fails to start with no
+explanation. `savecloud doctor` prints the correct line for this
+installation, and the desktop interface offers it with a Copy button.
+
 | Option | Effect |
 |--------|--------|
 | `--keep-local` | Resolve a conflict in favour of this device |

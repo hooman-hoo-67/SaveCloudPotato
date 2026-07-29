@@ -720,10 +720,14 @@ def test_pairing_asks_specifically_once_the_game_is_known(
 #
 
 
-def test_the_steam_launch_options_are_offered_verbatim(registered_game):
+def test_the_steam_launch_options_name_the_game_and_command(registered_game):
+    """
+    The program in front varies with how SaveCloud was installed, so
+    only the part that does not is asserted here.
+    """
 
-    assert GuiFacade.steam_launch_options(GAME_ID) == (
-        f"savecloud wrap {GAME_ID} -- %command%"
+    assert GuiFacade.steam_launch_options(GAME_ID).endswith(
+        f"wrap {GAME_ID} -- %command%"
     )
 
 
@@ -813,7 +817,12 @@ def test_diagnostics_treat_a_missing_command_as_a_choice(
 
     assert all(not finding.is_problem for finding in launched)
 
-    assert any("wrap" in finding.remedy for finding in launched)
+    #
+    # In the detail, not the remedy: `doctor` prints a remedy only for
+    # problems, and this is not one.
+    #
+
+    assert any("wrap" in finding.detail for finding in launched)
 
 
 def test_the_settings_dialog_offers_the_line_to_copy(qt_app, registered_game):
@@ -823,7 +832,7 @@ def test_the_settings_dialog_offers_the_line_to_copy(qt_app, registered_game):
     dialog = GameSettingsDialog(GuiFacade.detail(GAME_ID))
 
     assert dialog.launch_options_field.text() == (
-        f"savecloud wrap {GAME_ID} -- %command%"
+        GuiFacade.steam_launch_options(GAME_ID)
     )
 
     assert dialog.launch_options_field.isReadOnly() is True
@@ -839,7 +848,7 @@ def test_copying_puts_it_on_the_clipboard(qt_app, registered_game):
     dialog.copy_button.click()
 
     assert QApplication.clipboard().text() == (
-        f"savecloud wrap {GAME_ID} -- %command%"
+        GuiFacade.steam_launch_options(GAME_ID)
     )
 
 
@@ -851,6 +860,6 @@ def test_the_detail_pane_shows_the_line(qt_app, registered_game):
 
     window.games.list.setCurrentRow(0)
 
-    assert f"savecloud wrap {GAME_ID} -- %command%" in (
+    assert GuiFacade.steam_launch_options(GAME_ID) in (
         window.detail.toPlainText()
     )

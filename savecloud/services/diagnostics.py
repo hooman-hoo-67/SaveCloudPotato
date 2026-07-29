@@ -21,6 +21,7 @@ from savecloud.services.device import DeviceService
 from savecloud.services.library import SaveCloudLibrary
 from savecloud.services.registry import RegistryService
 from savecloud.storage import StorageRegistry
+from savecloud.utils.executable import launch_options
 
 
 class DiagnosticsService:
@@ -422,7 +423,7 @@ class DiagnosticsService:
                     remedy=(
                         f"Put this in the game's launch options, then "
                         f"launch it from {launcher.display_name()}:\n"
-                        f"savecloud wrap {game_id} -- %command%"
+                        f"{launch_options(game_id)}"
                     ),
                     game_id=game_id,
                 )
@@ -441,13 +442,16 @@ class DiagnosticsService:
                 Finding(
                     severity=Severity.OK,
                     title="Launched through Steam",
+                    #
+                    # In the detail rather than the remedy: `doctor`
+                    # prints a remedy only for problems, and this is
+                    # not one - so a remedy here would never be shown.
+                    #
                     detail=(
-                        "No launch command is set, so this game is "
-                        "started by Steam rather than by SaveCloud."
-                    ),
-                    remedy=(
+                        f"No launch command is set, so this game is "
+                        f"started by Steam rather than by SaveCloud.\n"
                         f"Steam launch options:\n"
-                        f"savecloud wrap {game_id} -- %command%"
+                        f"    {launch_options(game_id)}"
                     ),
                     game_id=game_id,
                 )

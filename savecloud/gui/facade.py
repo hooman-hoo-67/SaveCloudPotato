@@ -753,9 +753,16 @@ class GuiFacade:
         a Windows one alike. It is the ordinary way to use SaveCloud -
         a launch command is only needed by `savecloud play`, which
         starts the game itself.
+
+        The absolute path is used, because Steam is not started from a
+        shell that has activated anything: a bare name resolves to
+        nothing when SaveCloud lives in a virtual environment, and the
+        game fails to start with no explanation.
         """
 
-        return f"savecloud wrap {game_id} -- %command%"
+        from savecloud.utils.executable import launch_options
+
+        return launch_options(game_id)
 
     @staticmethod
     def adapter_for(game_id: str) -> AdapterChoice | None:
