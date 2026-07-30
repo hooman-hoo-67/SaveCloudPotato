@@ -1,0 +1,10 @@
+{
+  "name": "SaveCloud",
+  "author": "SaveCloudPotato",
+  "flags": ["root"],
+  "publish": {
+    "tags": ["utility", "save-management"],
+    "description": "Cloud saves for emulators, Proton games and anything else Steam Cloud leaves out. Check, synchronize and resolve conflicts without leaving Gaming Mode.",
+    "image": "https://raw.githubusercontent.com/hooman-hoo-67/SaveCloudPotato/main/packaging/savecloud.png"
+  }
+}

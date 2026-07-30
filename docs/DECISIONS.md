@@ -1626,3 +1626,83 @@ the next upload, and the command says so.
 Status
 
 Accepted
+
+---
+
+## The Decky plugin drops root before it runs anything
+
+Date: 2026-07-30
+
+Context
+
+Decky Loader runs plugin backends as root, under its own Python
+interpreter. Neither is where SaveCloud lives, so the backend shells out
+to the `savecloud` command and reads `--json` - the path
+`docs/DECISIONS.md` already committed to for a front end that cannot
+import services.
+
+Shelling out is where the problem starts rather than ends. The command
+reads `HOME` to find the save library, and the backend has to tell it
+whose `HOME` to use. Run as root with the desktop user's `HOME`, the
+first invocation writes root-owned files into
+`~/.local/share/savecloud`. Every later run as the user then fails on
+permissions, and someone is locked out of their own save library by a
+plugin installed to protect it. Nothing announces this; it looks like
+SaveCloud broke.
+
+Decision
+
+Every invocation drops to the desktop user before exec, through a
+`preexec_fn` calling `setgid` then `setuid`, guarded by a check that the
+backend is actually root. The environment is built rather than
+inherited: `HOME`, `PATH`, `USER`, `LOGNAME`, and `QT_QPA_PLATFORM` set
+to `offscreen` because a plugin backend has no display to reach.
+
+Which account that is comes from Decky, which reports whose session it
+is running inside. A name that does not resolve falls back to the
+current account rather than raising, and an unset one assumes `deck`.
+
+Verified rather than reasoned about: the backend was run as root against
+a real `savecloud` and a real second user, registering a game,
+uploading a save, resolving a conflict and writing a log. Nothing under
+that user's home was root-owned afterwards. The first attempt did report
+a root-owned directory - which turned out to be the test setup's own
+`mkdir`, not the plugin's, and was worth chasing down rather than
+explaining away.
+
+Nothing in the backend raises. Timeouts, exceptions, empty output and
+non-JSON prose all return `{"ok": false, "error": ...}`. Gaming Mode has
+nowhere to show a traceback: an exception crossing the bridge reaches
+the user as a panel that does nothing, which is indistinguishable from
+a plugin that is broken.
+
+The exit code decides success and the document explains it. A command
+that prints a document and then fails has failed, and trusting the
+document would report the opposite.
+
+Consequences
+
+The plugin cannot be tested end to end without a Deck. The backend can:
+`tests/test_decky.py` loads it against a stand-in for Decky's injected
+module and a fake `savecloud` that can be made to hang, crash, print
+prose or lie about its exit code. The React side is type-checked and
+built, which is not the same as verified.
+
+Setting games up stays in Desktop Mode. Choosing an adapter, locating a
+save folder inside a Proton prefix and entering cloud credentials are
+not controller work, and a panel offering them badly would be worse than
+one that does not.
+
+Tapping a conflicted game synchronizes it rather than asking first. With
+no resolution given the service refuses and describes both saves, so the
+attempt is how the detail is fetched - and it cannot disagree with
+reality the way a separate, earlier check could.
+
+Recent log lines are exposed, which the desktop interface never needed
+to do. On a Deck there is no other way to find out why a synchronization
+failed during a session without rebooting into Desktop Mode to read a
+file.
+
+Status
+
+Accepted. Not yet verified on a Steam Deck.

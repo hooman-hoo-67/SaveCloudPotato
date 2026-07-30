@@ -12,6 +12,10 @@ dist/
 build/
 *.egg-info/
 
+# Decky plugin frontend. The lock file is committed: a plugin that ships
+# a built bundle should build the same way twice.
+node_modules/
+
 # IDEs
 .vscode/
 .idea/

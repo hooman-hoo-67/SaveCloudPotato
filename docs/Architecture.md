@@ -50,6 +50,31 @@ use models and framework components; the three frameworks never depend
 on one another. Commands never import other commands - anything shared
 between them lives in `savecloud/utils/`.
 
+## Interfaces
+
+Three, entering at two different heights.
+
+```
+CLI  ──────────────┐
+                   │
+GUI (savecloud/gui)┤──►  Commands / Services
+   via GuiFacade   │
+                   │
+Decky plugin ──────┘
+   via `savecloud --json`, out of process
+```
+
+The CLI and the desktop interface are in-process. The desktop interface
+calls services through `GuiFacade` and never imports them directly, so
+widgets stay ignorant of the service layer.
+
+The Decky plugin is different in kind: it runs under Decky's interpreter,
+as root, and cannot import SaveCloud at all. It shells out to the
+`savecloud` command and parses `--json`. That is why `--json` is a flag
+on the existing commands rather than a separate set of them - a person
+and a program ask the same questions, and two code paths answering them
+would drift.
+
 ## Frameworks
 
 Each framework answers exactly one question.

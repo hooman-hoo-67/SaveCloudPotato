@@ -58,9 +58,13 @@ pip install -e ".[gui]"
 
 ## Current Status
 
-Milestones 1-11 complete. Desktop ↔ Steam Deck synchronization works
+Milestones 1-12 complete. Desktop ↔ Steam Deck synchronization works
 today over a shared folder, Syncthing, or Dropbox, and games can be
-launched from Steam.
+launched from Steam. There is a command line, a desktop window, and a
+Decky Loader plugin for Gaming Mode.
+
+The plugin's backend is tested and its frontend builds, but it has not
+yet been run on a Steam Deck.
 
 ## How it works
 
@@ -152,6 +156,24 @@ For Proton games, register with the `steam-proton` adapter: it finds
 the Proton prefix from the App ID and offers the save directories
 inside it.
 
+## Gaming Mode
+
+There is a Decky Loader plugin, in `decky/`. It shows each registered
+game's state, synchronizes one game or all of them, and resolves
+conflicts with both saves described - the things you need on a Deck in
+its handheld form.
+
+It needs SaveCloud installed for the desktop user:
+
+```bash
+savecloud install
+```
+
+Registering games stays in Desktop Mode. Choosing an adapter and
+locating a save folder inside a Proton prefix are not controller work.
+
+See `decky/README.md` for building and installing it.
+
 ## Cloud storage
 
 Dropbox works as a backend. Set it up once per device:
@@ -190,11 +212,17 @@ stops rather than choosing:
 ✗ Save conflict for "pokemon-scarlet": this device and the remote
   have both changed since the last synchronization.
 
+  keep-local    This device · saved 8 minutes ago · version 1
+  keep-remote   steamdeck · saved 3 hours ago · version 6
+
 Nothing has been overwritten. Resolve it with one of:
 
   savecloud sync pokemon-scarlet --keep-local
   savecloud sync pokemon-scarlet --keep-remote
 ```
+
+Both saves are described, because being told two checksums differ does
+not help anyone choose between them.
 
 Whichever save loses is kept in version history, so the choice is
 reversible.

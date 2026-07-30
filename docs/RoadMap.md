@@ -128,6 +128,38 @@ Saved Games are all scanned, ordered by how recently each was written.
 Verified against a real Proton game on a BC250. Cross-device
 compatibility of a Proton save has not been tested.
 
+### Milestone 13 - Decky Loader Plugin
+
+- [x] backend driving `savecloud --json`
+- [x] game list with per-game state
+- [x] sync one game, sync everything
+- [x] conflict resolution with both saves described
+- [x] recent log lines
+- [ ] verified on a Steam Deck
+
+SaveCloud in Gaming Mode. See `decky/README.md`.
+
+The backend does not import SaveCloud - it runs the command and reads
+its `--json` output. Decky runs plugin backends as root under its own
+interpreter, and a command run as root against the user's `HOME` would
+leave root-owned files in `~/.local/share/savecloud`, locking someone
+out of their own library from inside a plugin meant to protect it. Every
+invocation drops to the desktop user before exec.
+
+This is what the `--json` flag was added for, and it required no change
+to the CLI at all - every question the panel asks was already answerable.
+The panel opens by running `sync --check` across the whole library in one
+call rather than one per game.
+
+Nothing in the backend raises. Gaming Mode cannot show a traceback, so
+timeouts, crashes, silence and non-JSON prose all arrive as documents.
+
+Setting games up stays in Desktop Mode. Choosing an adapter and locating
+a save folder are not controller work.
+
+The backend is tested; the React side is type-checked and built, which
+is not the same as verified. It has not run on a Deck.
+
 ### Not planned
 
 - non-Steam shortcut creation (`shortcuts.vdf`)
@@ -160,11 +192,9 @@ same result with none of that. See `docs/DECISIONS.md`.
 
 ### Platform Features
 
-- [ ] Decky Loader plugin
 - [ ] Millennium plugin
 - [ ] automatic game discovery
 - [ ] snapshot browser
-- [ ] graphical interface
 
 ### Platforms
 
