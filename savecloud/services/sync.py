@@ -19,6 +19,7 @@ from savecloud.services.registry import RegistryService
 from savecloud.services.save import SaveService
 from savecloud.storage import StorageRegistry
 from savecloud.services import journal
+from savecloud.services.locking import GameLock
 from savecloud.storage.base import BaseStorageBackend
 
 
@@ -409,6 +410,27 @@ class SyncService:
         ------
         SyncConflictError
             If both sides changed and ``resolution`` is ABORT.
+        """
+
+        game_id = game.manifest.game_id
+
+        #
+        # Held for the whole decision and its consequence. Comparing
+        # against a remote and then acting on the answer is only safe
+        # if nothing changes underneath in between.
+        #
+
+        with GameLock.hold(game_id, "synchronizing"):
+
+            return SyncService._sync_locked(game, resolution)
+
+    @staticmethod
+    def _sync_locked(
+        game: Game,
+        resolution: ConflictResolution,
+    ) -> SyncAction:
+        """
+        Synchronize, with the game already claimed.
         """
 
         game_id = game.manifest.game_id

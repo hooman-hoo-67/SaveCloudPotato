@@ -25,6 +25,7 @@ import subprocess
 
 from savecloud.launchers import LauncherRegistry
 from savecloud.services import journal
+from savecloud.services.locking import GameLock
 from savecloud.models.game import Game
 from savecloud.services.device import DeviceService
 from savecloud.services.launch import LaunchService
@@ -208,20 +209,24 @@ class AutoSyncService:
         result = PlayResult(exit_code=0)
 
         #
-        # Bring this device up to date before playing.
+        # Held for the whole session. A sync starting midway through
+        # could decide to download and publish a remote save into the
+        # working directory - over the file the running game has open.
         #
 
-        AutoSyncService.before_launch(game, resolution, result)
+        with GameLock.hold(game_id, "playing", long_lived=True):
 
-        game.runtime.mark_running()
+            AutoSyncService.before_launch(game, resolution, result)
 
-        RegistryService.update_runtime(game)
+            game.runtime.mark_running()
 
-        process = LaunchService.launch(profile)
+            RegistryService.update_runtime(game)
 
-        exit_code = LaunchService.wait(process)
+            process = LaunchService.launch(profile)
 
-        AutoSyncService.after_exit(game, exit_code, result)
+            exit_code = LaunchService.wait(process)
+
+            AutoSyncService.after_exit(game, exit_code, result)
 
         return result
 
@@ -263,17 +268,23 @@ class AutoSyncService:
 
         result = PlayResult(exit_code=0)
 
-        AutoSyncService.before_launch(game, resolution, result)
+        with GameLock.hold(
+            game.manifest.game_id,
+            "playing",
+            long_lived=True,
+        ):
 
-        game.runtime.mark_running()
+            AutoSyncService.before_launch(game, resolution, result)
 
-        RegistryService.update_runtime(game)
+            game.runtime.mark_running()
 
-        process = subprocess.Popen(argv)
+            RegistryService.update_runtime(game)
 
-        exit_code = AutoSyncService._wait_forwarding_signals(process)
+            process = subprocess.Popen(argv)
 
-        AutoSyncService.after_exit(game, exit_code, result)
+            exit_code = AutoSyncService._wait_forwarding_signals(process)
+
+            AutoSyncService.after_exit(game, exit_code, result)
 
         return result
 

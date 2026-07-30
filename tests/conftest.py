@@ -12,6 +12,8 @@ from pathlib import Path
 
 import pytest
 
+from savecloud.utils import atomic
+
 from savecloud.models.device_profile import DeviceProfile
 from savecloud.models.game import (
     Game,
@@ -188,3 +190,21 @@ def read_save(
     """
 
     return (directory / name).read_text(encoding="utf-8")
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _skip_durability():
+    """
+    Do not force writes to disk during tests.
+
+    Every state write would otherwise cost a real disk round trip, for
+    documents in a temporary directory that is about to be deleted.
+    The atomic rename - which is what the tests are actually about - is
+    unaffected.
+    """
+
+    atomic.DURABLE = False
+
+    yield
+
+    atomic.DURABLE = True

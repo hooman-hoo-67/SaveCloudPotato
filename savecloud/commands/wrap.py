@@ -22,9 +22,10 @@ from typing import List, Optional
 
 import typer
 
+from savecloud.services.locking import GameBusyError
 from savecloud.services.autosync import AutoSyncService
 from savecloud.services.sync import SyncConflictError
-from savecloud.utils.output import report_conflict, require_game, resolution_from_flags
+from savecloud.utils.output import report_busy, report_conflict, require_game, resolution_from_flags
 
 
 def wrap(
@@ -101,6 +102,14 @@ def wrap(
 
     try:
         result = AutoSyncService.wrap(game, argv, resolution)
+
+    except GameBusyError as error:
+        #
+        # Another session, or a sync in progress. Starting a second one
+        # would have both capture the same working save afterwards.
+        #
+
+        report_busy(error)
 
     except SyncConflictError as error:
         report_conflict(error)

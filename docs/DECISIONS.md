@@ -664,6 +664,74 @@ Accepted
 
 ---
 
+## One writer per game, and no half-written documents
+
+Date: 2026-07-29
+
+Context
+
+Two things were true and neither had been addressed, because until
+there were users neither could happen.
+
+Every state document was written with `open("w")`, which truncates
+before it writes. A process dying between those two moments leaves
+nothing where the state used to be. That window is reachable: Steam
+escalates SIGTERM to SIGKILL during shutdown, SIGKILL cannot be
+caught, and `after_exit` writes `runtime.json` during exactly that
+window. Losing that file loses `last_sync_checksum` - the ancestor
+conflict detection compares against, which is the safety mechanism
+rather than a convenience.
+
+And nothing coordinated two processes. The interface has a Sync all
+button, Steam starts `wrap` independently, and a terminal is always
+available. A sync deciding to download while a session is in progress
+publishes a remote save over the file the running game has open.
+
+Decision
+
+State is written to a temporary file in the same directory and renamed
+over the target, so a reader sees the old document or the new one and
+never half of one.
+
+A game is claimed while something acts on it, through an flock under
+`cache/locks/`. A session holds its game for as long as the game runs.
+
+Consequences
+
+The claim is the flock, not the file, so a lock file left behind by a
+crash means nothing - which is why they live in `cache/`, already
+documented as safe to delete.
+
+Locks are re-entrant per process. flock is per file descriptor, so
+without a depth count an operation nested inside another would release
+the outer claim on its way out.
+
+A session is refused immediately rather than waited for. Found by
+measuring: a sync issued during a session sat blocked for four seconds
+and then proceeded, and with a real game would have served a full
+five-second timeout before failing. Waiting is right for another sync
+finishing and never right for something that lasts as long as someone
+plays, so the lock records which kind of claim it is.
+
+`fsync` before the rename is what makes a write survive the machine
+losing power, at the cost of a disk round trip per document. It is on
+by default and off in tests, which write thousands of documents to a
+directory they are about to delete. The rename - what the tests are
+actually about - is unaffected.
+
+Credentials moved onto the same path. They were truncate-then-write
+too, and a token half-written is a provider that cannot be reached.
+
+Windows has no `fcntl`. Support there is unverified anyway, and
+running unprotected is what every version until now did, so the lock
+becomes a no-op rather than a refusal to start.
+
+Status
+
+Accepted
+
+---
+
 ## What happened during a session has to survive it
 
 Date: 2026-07-29

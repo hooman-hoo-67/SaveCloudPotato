@@ -80,6 +80,35 @@ def fail(message: str, **fields: Any) -> None:
     raise typer.Exit(code=1)
 
 
+def report_busy(error) -> None:
+    """
+    Explain that something else is already acting on the game.
+
+    Not an error in the installation, so it says what is happening
+    rather than what is broken.
+    """
+
+    if _json:
+        emit(
+            {
+                "ok": False,
+                "game_id": getattr(error, "game_id", ""),
+                "error": str(error),
+                "reason": "busy",
+            }
+        )
+
+    else:
+        typer.secho(f"✗ {error}", fg=typer.colors.RED)
+
+        typer.echo()
+        typer.echo(
+            "Wait for it to finish, or close the game if it is running."
+        )
+
+    raise typer.Exit(code=1)
+
+
 def require_game(game_id: str) -> Game:
     """
     Load a registered game, or exit with a readable message.

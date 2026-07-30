@@ -13,6 +13,7 @@ import json
 
 from savecloud.config.constants import config_path, savecloud_home
 from savecloud.models.installation_config import InstallationConfig
+from savecloud.utils.atomic import write_json
 
 
 class ConfigurationService:
@@ -57,15 +58,7 @@ class ConfigurationService:
             exist_ok=True,
         )
 
-        with config_path().open(
-            "w",
-            encoding="utf-8",
-        ) as file:
-            json.dump(
-                config.to_dict(),
-                file,
-                indent=4,
-            )
+        write_json(config_path(), config.to_dict())
 
     @staticmethod
     def load() -> InstallationConfig:

@@ -247,6 +247,11 @@ them would overwrite valid local configuration with another device's.
 Temporary runtime data. Nothing here is required for recovery, and it
 is always safe to delete.
 
+`cache/locks/<game-id>.lock` claims a game while something is acting
+on it, so the interface and a Steam session cannot both decide what to
+do with one save. The claim is the lock held on the file rather than
+the file itself, so one left behind by a crash means nothing.
+
 ---
 
 # logs/

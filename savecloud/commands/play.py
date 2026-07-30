@@ -6,10 +6,11 @@ from __future__ import annotations
 
 import typer
 
+from savecloud.services.locking import GameBusyError
 from savecloud.services.autosync import AutoSyncService, UntrackableLaunchError
 from savecloud.services.registry import RegistryService
 from savecloud.services.sync import SyncConflictError
-from savecloud.utils.output import report_conflict, resolution_from_flags
+from savecloud.utils.output import report_busy, report_conflict, resolution_from_flags
 
 
 def play(
@@ -44,6 +45,14 @@ def play(
 
     try:
         result = AutoSyncService.play(game, resolution)
+
+    except GameBusyError as error:
+        #
+        # Another session, or a sync in progress. Starting a second one
+        # would have both capture the same working save afterwards.
+        #
+
+        report_busy(error)
 
     except SyncConflictError as error:
         report_conflict(error)

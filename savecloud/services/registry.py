@@ -26,6 +26,7 @@ from savecloud.models.game import (
     Platform,
     SyncStatus,
 )
+from savecloud.utils.atomic import write_json
 
 
 class RegistryService:
@@ -96,10 +97,10 @@ class RegistryService:
         data["launch_type"] = manifest.launch_type.value
         data["platform"] = manifest.platform.value
 
-        with RegistryService.registry_manifest_path(manifest.game_id).open(
-            "w", encoding="utf-8"
-        ) as file:
-            json.dump(data, file, indent=4)
+        write_json(
+            RegistryService.registry_manifest_path(manifest.game_id),
+            data,
+        )
 
     @staticmethod
     def save_runtime(
@@ -127,10 +128,10 @@ class RegistryService:
 
         data["created_at"] = runtime.created_at.isoformat()
 
-        with RegistryService.registry_runtime_path(game_id).open(
-            "w", encoding="utf-8"
-        ) as file:
-            json.dump(data, file, indent=4)
+        write_json(
+            RegistryService.registry_runtime_path(game_id),
+            data,
+        )
 
     @staticmethod
     def load_manifest(

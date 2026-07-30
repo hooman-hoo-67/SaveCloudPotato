@@ -17,6 +17,7 @@ from pathlib import Path
 
 from savecloud.config import layout
 from savecloud.models.device_profile import DeviceProfile
+from savecloud.utils.atomic import write_json
 
 
 class DeviceService:
@@ -81,18 +82,13 @@ class DeviceService:
         if profile.last_local_sync is not None:
             data["last_local_sync"] = profile.last_local_sync.isoformat()
 
-        with DeviceService.profile_path(
-            profile.device_id,
-            profile.game_id,
-        ).open(
-            "w",
-            encoding="utf-8",
-        ) as file:
-            json.dump(
-                data,
-                file,
-                indent=4,
-            )
+        write_json(
+            DeviceService.profile_path(
+                profile.device_id,
+                profile.game_id,
+            ),
+            data,
+        )
 
     @staticmethod
     def load_profile(

@@ -7,6 +7,7 @@ from __future__ import annotations
 import typer
 
 from savecloud.services.registry import RegistryService
+from savecloud.services.locking import GameBusyError
 from savecloud.services.sync import (
     ConflictResolution,
     StorageUnavailableError,
@@ -17,6 +18,7 @@ from savecloud.services.sync import (
 from savecloud.utils import output
 from savecloud.utils.output import (
     clear_progress,
+    report_busy,
     report_conflict,
     resolution_from_flags,
     show_progress,
@@ -108,6 +110,11 @@ def sync(
         report_conflict(error)
 
         raise typer.Exit(code=1)
+
+    except GameBusyError as error:
+        clear_progress()
+
+        report_busy(error)
 
     except StorageUnavailableError as error:
         clear_progress()

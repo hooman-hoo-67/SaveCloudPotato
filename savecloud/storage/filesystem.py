@@ -31,6 +31,7 @@ from savecloud.models.remote_state import RemoteState
 from savecloud.storage.base import BaseStorageBackend
 from savecloud.utils.filesystem import remove_directory, replace_directory
 from savecloud.utils.hashing import hash_directory
+from savecloud.utils.atomic import write_json
 
 
 class FilesystemStorageBackend(BaseStorageBackend):
@@ -401,15 +402,7 @@ class FilesystemStorageBackend(BaseStorageBackend):
         Persist the remote state document.
         """
 
-        with cls.state_path(game_id).open(
-            "w",
-            encoding="utf-8",
-        ) as file:
-            json.dump(
-                state.to_dict(),
-                file,
-                indent=4,
-            )
+        write_json(cls.state_path(game_id), state.to_dict())
 
     @staticmethod
     def _copy_file(

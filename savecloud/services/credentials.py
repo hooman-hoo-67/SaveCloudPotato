@@ -12,10 +12,10 @@ Files are written with owner-only permissions.
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 
 from savecloud.config.constants import provider_dir
+from savecloud.utils.atomic import write_json
 
 
 class CredentialService:
@@ -83,14 +83,13 @@ class CredentialService:
         # readable by anyone else.
         #
 
-        descriptor = os.open(
-            path,
-            os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
-            0o600,
-        )
+        #
+        # Written atomically and privately: a token half-written is a
+        # provider that cannot be reached, and a token briefly
+        # world-readable is worse than either.
+        #
 
-        with os.fdopen(descriptor, "w", encoding="utf-8") as file:
-            json.dump(credentials, file, indent=4)
+        write_json(path, credentials, mode=0o600)
 
     @staticmethod
     def update(

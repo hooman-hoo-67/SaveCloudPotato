@@ -25,6 +25,7 @@ from savecloud.config.constants import (
     install_metadata_path,
     savecloud_home,
 )
+from savecloud.utils.atomic import write_json
 
 
 class SaveCloudLibrary:
@@ -64,8 +65,7 @@ class SaveCloudLibrary:
             "created_at": datetime.now(UTC).isoformat(),
         }
 
-        with path.open("w", encoding="utf-8") as file:
-            json.dump(metadata, file, indent=4)
+        write_json(path, metadata)
 
     @staticmethod
     def installation_metadata() -> dict:
@@ -195,15 +195,10 @@ class SaveCloudLibrary:
         Save a game's library metadata.
         """
 
-        with SaveCloudLibrary.metadata_path(game_id).open(
-            "w",
-            encoding="utf-8",
-        ) as file:
-            json.dump(
-                metadata.to_dict(),
-                file,
-                indent=4,
-            )
+        write_json(
+            SaveCloudLibrary.metadata_path(game_id),
+            metadata.to_dict(),
+        )
 
     @staticmethod
     def create_game_library(game: Game) -> None:

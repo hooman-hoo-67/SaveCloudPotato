@@ -6,8 +6,14 @@ from __future__ import annotations
 
 import typer
 
+from savecloud.services.locking import GameBusyError
 from savecloud.services.sync import StorageUnavailableError, SyncService
-from savecloud.utils.output import clear_progress, require_game, show_progress
+from savecloud.utils.output import (
+    clear_progress,
+    report_busy,
+    require_game,
+    show_progress,
+)
 
 
 def download(
@@ -23,6 +29,11 @@ def download(
 
     try:
         SyncService.download(game)
+
+    except GameBusyError as error:
+        clear_progress()
+
+        report_busy(error)
 
     except StorageUnavailableError as error:
         clear_progress()
