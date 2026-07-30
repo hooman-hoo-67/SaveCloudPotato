@@ -219,6 +219,12 @@ document — written by an older version, or by a plain file copy — has
 one derived from its contents on read, so conflict detection still has
 something to compare.
 
+`device_name` and `updated_at` are what a conflict is described with.
+Choosing between two saves means knowing which machine the other came
+from and how recently someone played on it; a checksum answers
+neither. A derived state has no name to report, and is described as
+"another device" rather than given one.
+
 ---
 
 ## Version

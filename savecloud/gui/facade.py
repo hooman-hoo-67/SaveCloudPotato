@@ -66,6 +66,15 @@ class Outcome:
 
     value: str = ""
 
+    #
+    # The two sides of a conflict, when there is one. The interface has
+    # to describe them: a choice between "this device" and "the remote"
+    # with nothing else said is a coin toss over someone's progress.
+    #
+
+    local: object | None = None
+    remote: object | None = None
+
 
 @dataclass(slots=True)
 class AdapterChoice:
@@ -421,7 +430,7 @@ class GuiFacade:
                 choice,
             )
 
-        except SyncConflictError:
+        except SyncConflictError as error:
             return Outcome(
                 ok=False,
                 conflict=True,
@@ -430,6 +439,8 @@ class GuiFacade:
                     "This device and the remote have both changed since "
                     "they last agreed."
                 ),
+                local=error.local,
+                remote=error.remote,
             )
 
         except StorageUnavailableError as error:

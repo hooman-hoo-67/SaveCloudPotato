@@ -254,7 +254,16 @@ Synchronize a game, or every game when the ID is omitted.
 | `--keep-remote` | Resolve a conflict in favour of the remote |
 
 Without a resolution flag a conflict aborts with a non-zero exit code
-and nothing is overwritten.
+and nothing is overwritten. Both saves are described first, so the
+choice is an informed one:
+
+```
+✗ Save conflict for "zelda": this device and the remote have both
+  changed since the last synchronization.
+
+  keep-local    This device · saved 8 minutes ago · version 1
+  keep-remote   steamdeck · saved 3 hours ago · version 6
+```
 
 ```
 savecloud sync                        every game

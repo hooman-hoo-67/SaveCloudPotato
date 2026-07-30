@@ -7,6 +7,8 @@ facing behaviour rather than re-testing service logic.
 
 from __future__ import annotations
 
+import pathlib
+
 import pytest
 from typer.testing import CliRunner
 
@@ -585,14 +587,30 @@ def test_version_reports_the_build():
     assert __version__ in result.output
 
 
-def test_version_matches_the_distribution():
+def test_the_distribution_reads_its_version_from_the_code():
     """
-    One source of truth. A packaged build carries the version in code
-    rather than in metadata, which PyInstaller need not include.
+    One source of truth.
+
+    Deliberately not compared against `importlib.metadata`: that
+    reflects the *installed* metadata, which goes stale the moment the
+    version changes and does not refresh until someone reinstalls. A
+    test that fails after every version bump is testing whoever last
+    ran pip, not the code.
     """
 
-    import importlib.metadata
+    import tomllib
 
     from savecloud import __version__
 
-    assert importlib.metadata.version("savecloud") == __version__
+    root = pathlib.Path(__file__).resolve().parent.parent
+
+    project = tomllib.loads((root / "pyproject.toml").read_text())
+
+    assert "version" in project["project"]["dynamic"]
+
+    assert (
+        project["tool"]["setuptools"]["dynamic"]["version"]["attr"]
+        == "savecloud.__version__"
+    )
+
+    assert __version__

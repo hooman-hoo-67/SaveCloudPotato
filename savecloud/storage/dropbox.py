@@ -36,6 +36,7 @@ from savecloud.models.game import Game
 from savecloud.models.remote_state import RemoteState
 from savecloud.services.configuration import ConfigurationService
 from savecloud.services.credentials import CredentialService
+from savecloud.services.library import SaveCloudLibrary
 from savecloud.storage.base import BaseStorageBackend
 from savecloud.utils import http
 from savecloud.utils.filesystem import remove_directory, replace_directory
@@ -707,12 +708,19 @@ class DropboxStorageBackend(BaseStorageBackend):
                     local.read_bytes(),
                 )
 
+        #
+        # Named, not just identified. A conflict asks someone to choose
+        # between this save and another, and "another device
+        # (a3f81c2e)" is not something anyone can weigh against their
+        # own machine.
+        #
+
         state = RemoteState.create(
             game_id=game_id,
             checksum=hash_directory(source),
             version=game.runtime.current_version,
             device_id=game.runtime.last_device or "",
-            device_name="",
+            device_name=SaveCloudLibrary.device_name(),
         )
 
         client.upload(

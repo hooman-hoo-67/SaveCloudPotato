@@ -13,6 +13,7 @@ from enum import StrEnum
 
 from savecloud.models.game import Game, GameRuntime
 from savecloud.models.remote_state import RemoteState
+from savecloud.models.save_summary import SaveSummary, describe_age
 from savecloud.services.device import DeviceService
 from savecloud.services.library import SaveCloudLibrary
 from savecloud.services.registry import RegistryService
@@ -24,6 +25,32 @@ from savecloud.storage.base import BaseStorageBackend
 
 
 log = journal.logger("sync")
+
+
+def _last_written(directory) -> float:
+    """
+    When a file inside a directory was most recently written.
+
+    Directory timestamps are ignored: they move when anything is
+    created beside the save, which makes an untouched folder look
+    freshly used.
+    """
+
+    newest = 0.0
+
+    if not directory.exists():
+        return newest
+
+    for path in directory.rglob("*"):
+
+        try:
+            if path.is_file():
+                newest = max(newest, path.stat().st_mtime)
+
+        except OSError:
+            continue
+
+    return newest
 
 
 class SyncAction(StrEnum):
@@ -68,6 +95,11 @@ class ConflictResolution(StrEnum):
 class SyncConflictError(RuntimeError):
     """
     Raised when both sides changed and no resolution was supplied.
+
+    Carries a description of each side. Being told that two saves
+    differ is not enough to choose between them: the question is which
+    machine the other one came from and how recently someone was
+    playing on it, and that is what the summaries answer.
     """
 
     def __init__(
@@ -75,6 +107,8 @@ class SyncConflictError(RuntimeError):
         game_id: str,
         local_checksum: str,
         remote_checksum: str,
+        local: SaveSummary | None = None,
+        remote: SaveSummary | None = None,
     ) -> None:
 
         super().__init__(
@@ -85,6 +119,9 @@ class SyncConflictError(RuntimeError):
         self.game_id = game_id
         self.local_checksum = local_checksum
         self.remote_checksum = remote_checksum
+
+        self.local = local
+        self.remote = remote
 
 
 class StorageUnavailableError(RuntimeError):
@@ -209,6 +246,89 @@ class SyncService:
         #
 
         return SyncAction.CONFLICT
+
+    # ------------------------------------------------------------------
+    # Description
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def describe_local(game: Game) -> SaveSummary:
+        """
+        Describe the save this device would keep.
+
+        Reads the working save's own modification time rather than the
+        runtime's `last_sync`: what is being offered is the save as it
+        is now, and a session played offline has changed it since
+        anything was recorded about it.
+        """
+
+        from datetime import UTC, datetime
+
+        game_id = game.manifest.game_id
+
+        device_id = SaveCloudLibrary.device_id()
+
+        source = SaveCloudLibrary.current_directory(game_id)
+
+        if DeviceService.exists(device_id, game_id):
+
+            profile = DeviceService.load_profile(device_id, game_id)
+
+            if profile.working_save_path.exists():
+                source = profile.working_save_path
+
+        written = _last_written(source)
+
+        moment = (
+            datetime.fromtimestamp(written, UTC) if written else None
+        )
+
+        metadata = SaveCloudLibrary.load_library_metadata(game_id)
+
+        return SaveSummary(
+            where="This device",
+            modified=(
+                moment.astimezone().strftime("%Y-%m-%d %H:%M")
+                if moment
+                else "unknown"
+            ),
+            age=describe_age(moment),
+            version=metadata.latest_version,
+            checksum=SyncService.local_checksum(game),
+        )
+
+    @staticmethod
+    def describe_remote(remote: RemoteState | None) -> SaveSummary | None:
+        """
+        Describe the save storage is holding.
+
+        A remote written before device names were recorded, or by a
+        plain file copy, has nothing to identify it. Saying "another
+        device" is more honest than inventing a name for it.
+        """
+
+        if remote is None:
+            return None
+
+        from datetime import datetime
+
+        try:
+            moment = datetime.fromisoformat(remote.updated_at)
+
+        except (TypeError, ValueError):
+            moment = None
+
+        return SaveSummary(
+            where=remote.device_name or "Another device",
+            modified=(
+                moment.astimezone().strftime("%Y-%m-%d %H:%M")
+                if moment
+                else "unknown"
+            ),
+            age=describe_age(moment),
+            version=remote.version,
+            checksum=remote.checksum,
+        )
 
     @staticmethod
     def status(game: Game) -> SyncAction:
@@ -690,6 +810,8 @@ class SyncService:
                 game_id,
                 SyncService.local_checksum(game),
                 remote.checksum if remote else "",
+                local=SyncService.describe_local(game),
+                remote=SyncService.describe_remote(remote),
             )
 
         if resolution is ConflictResolution.LOCAL:

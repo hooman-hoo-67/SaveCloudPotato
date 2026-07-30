@@ -94,19 +94,6 @@ def sync(
     except SyncConflictError as error:
         clear_progress()
 
-        if output.json_mode():
-            output.emit(
-                {
-                    "ok": False,
-                    "game_id": game_id,
-                    "action": "conflict",
-                    "error": str(error),
-                    "resolutions": ["keep-local", "keep-remote"],
-                }
-            )
-
-            raise typer.Exit(code=1)
-
         report_conflict(error)
 
         raise typer.Exit(code=1)

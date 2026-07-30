@@ -57,6 +57,22 @@ ATTENTION = {"conflict", "error", "pending"}
 WORKER_SHUTDOWN_MS = 3000
 
 
+def _side(summary, fallback: str) -> str:
+    """
+    Name one side of a conflict for a button.
+
+    A button reading "Keep Steam Deck" says which save is being kept;
+    "Keep the remote save" only says where it happens to live.
+    """
+
+    if summary is None:
+        return fallback
+
+    where = summary.where
+
+    return "this device" if where == "This device" else where
+
+
 class GameList(QWidget):
     """
     Every registered game, with its state.
@@ -845,18 +861,33 @@ class MainWindow(QMainWindow):
             f"storage since they last agreed."
         )
 
+        #
+        # The descriptions are the point of the dialog. "Keep this one
+        # or that one" with nothing else said is a coin toss over
+        # someone's progress; when each was written, and on what, is
+        # what makes it a decision.
+        #
+
+        details = [
+            summary.description
+            for summary in (outcome.local, outcome.remote)
+            if summary is not None
+        ]
+
         box.setInformativeText(
-            "Whichever save you do not keep is saved to this game's "
+            "\n".join(details)
+            + ("\n\n" if details else "")
+            + "Whichever save you do not keep is saved to this game's "
             "version history, so nothing is lost either way."
         )
 
         keep_local = box.addButton(
-            "Keep this device's save",
+            f"Keep {_side(outcome.local, 'this device')}",
             QMessageBox.AcceptRole,
         )
 
         keep_remote = box.addButton(
-            "Keep the remote save",
+            f"Keep {_side(outcome.remote, 'the remote')}",
             QMessageBox.DestructiveRole,
         )
 

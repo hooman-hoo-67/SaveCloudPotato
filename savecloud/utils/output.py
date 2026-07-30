@@ -182,13 +182,45 @@ def report_conflict(
     error: SyncConflictError,
 ) -> None:
     """
-    Explain a conflict and how to resolve it.
+    Explain a conflict, describe both saves, and say how to resolve it.
+
+    The description is the point. Being told two saves differ does not
+    help anyone choose between them; being told one was written ten
+    minutes ago here and the other two hours ago on a Steam Deck does.
     """
+
+    if _json:
+        emit(
+            {
+                "ok": False,
+                "game_id": error.game_id,
+                "action": "conflict",
+                "error": str(error),
+                "resolutions": ["keep-local", "keep-remote"],
+                "local": _summary_dict(error.local),
+                "remote": _summary_dict(error.remote),
+            }
+        )
+
+        return
 
     typer.secho(
         f"✗ {error}",
         fg=typer.colors.RED,
     )
+
+    if error.local is not None or error.remote is not None:
+
+        typer.echo()
+
+        for label, summary in (
+            ("keep-local ", error.local),
+            ("keep-remote", error.remote),
+        ):
+            if summary is None:
+                continue
+
+            typer.echo(f"  {label}   {summary.description}")
 
     typer.echo()
     typer.echo("Nothing has been overwritten. Resolve it with one of:")
@@ -197,6 +229,23 @@ def report_conflict(
     typer.echo(f"  savecloud sync {error.game_id} --keep-remote")
     typer.echo()
     typer.echo("Whichever save loses is kept in this game's version history.")
+
+
+def _summary_dict(summary) -> dict | None:
+    """
+    Render a save summary for machine-readable output.
+    """
+
+    if summary is None:
+        return None
+
+    return {
+        "where": summary.where,
+        "modified": summary.modified,
+        "age": summary.age,
+        "version": summary.version,
+        "checksum": summary.checksum,
+    }
 
 
 def show_progress(quiet: bool = False) -> None:

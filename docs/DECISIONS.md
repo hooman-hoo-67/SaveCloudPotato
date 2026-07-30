@@ -664,6 +664,61 @@ Accepted
 
 ---
 
+## A conflict describes both saves
+
+Date: 2026-07-29
+
+Context
+
+Resolving a conflict means keeping one save and discarding the other.
+`SyncConflictError` carried two checksums, and the interface offered
+"Keep this device's save" against "Keep the remote save" with nothing
+else said.
+
+Nobody can weigh that. Two checksums are equally opaque, and neither
+answers the question people actually have: which machine is the other
+save from, and how recently was someone playing on it.
+
+`RemoteState` already recorded `device_name`, `updated_at` and
+`version`. All of it was discarded on the way to the question.
+
+Decision
+
+The conflict carries a `SaveSummary` for each side - where the save is,
+when it was last written, how long ago that was in words, and which
+version it corresponds to. The command line prints both against the
+flag that keeps them; the interface shows both and names each device on
+its button.
+
+    keep-local    This device · saved 8 minutes ago · version 1
+    keep-remote   steamdeck · saved 3 hours ago · version 6
+
+Consequences
+
+Found while implementing: `device_name` was hardcoded to the empty
+string at every site that ever wrote a `RemoteState`. A documented
+field that had never held a value, and precisely the one needed here.
+Upload now records this device's name; the sites that derive a state
+from a remote nobody claimed still leave it empty, and that renders as
+"Another device" rather than an invented name.
+
+The local side reads the working save's own modification time rather
+than anything in the runtime. What is being offered is the save as it
+is now, and a session played offline has changed it since anything was
+recorded about it.
+
+Ages are deliberately coarse - "3 hours ago", not "3 hours 14
+minutes". The finer number invites reading a precision these
+timestamps do not have, since the two came from different machines with
+different clocks. A remote that appears to be from the future says so,
+which is more honest than rendering a negative interval.
+
+Status
+
+Accepted
+
+---
+
 ## History follows the session rather than ending it
 
 Date: 2026-07-29
