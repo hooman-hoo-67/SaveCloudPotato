@@ -388,6 +388,53 @@ def test_an_unset_user_assumes_steamos(tmp_path):
     assert module._user().pw_uid == expected
 
 
+def test_certificate_trust_reaches_the_command(tmp_path, monkeypatch):
+    """
+    A network that inspects TLS must not break only in Gaming Mode.
+
+    Trust is configured through the environment and nowhere else. The
+    backend builds its environment rather than inheriting one, so
+    without carrying these across, a Deck that syncs fine from a
+    terminal would fail from the panel with a certificate error and no
+    obvious reason why.
+    """
+
+    module = load(tmp_path)
+
+    monkeypatch.setenv("SSL_CERT_FILE", "/etc/ssl/somewhere.pem")
+    monkeypatch.setenv("HTTPS_PROXY", "http://proxy:3128")
+
+    install_fake(
+        tmp_path,
+        "#!/bin/sh\n"
+        'echo "{\\"ok\\": true, \\"ca\\": \\"$SSL_CERT_FILE\\", '
+        '\\"proxy\\": \\"$HTTPS_PROXY\\"}"\n',
+    )
+
+    answer = run(module.Plugin().games())
+
+    assert answer["ca"] == "/etc/ssl/somewhere.pem"
+    assert answer["proxy"] == "http://proxy:3128"
+
+
+def test_an_unset_variable_is_not_invented(tmp_path, monkeypatch):
+    """
+    Passing an empty value through is worse than passing nothing.
+    """
+
+    module = load(tmp_path)
+
+    monkeypatch.delenv("SSL_CERT_FILE", raising=False)
+
+    install_fake(
+        tmp_path,
+        "#!/bin/sh\n"
+        'echo "{\\"ok\\": true, \\"seen\\": \\"${SSL_CERT_FILE-unset}\\"}"\n',
+    )
+
+    assert run(module.Plugin().games())["seen"] == "unset"
+
+
 def test_qt_is_told_there_is_no_display(tmp_path):
     """
     The one binary serves both interfaces, and dispatches on argv.

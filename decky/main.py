@@ -44,6 +44,28 @@ CANDIDATES = (
     "SaveCloud-x86_64.AppImage",
 )
 
+#
+# Environment the command needs to reach the network, carried across
+# from whatever Decky was started with. Certificate trust and proxies
+# are configured here and nowhere else, so a fixed environment that
+# omitted them would leave the plugin unable to reach a cloud provider
+# on a network where the command line works.
+#
+# urllib reads the lower-case proxy names too, and something has
+# usually set only one spelling.
+#
+
+PASSED_THROUGH = (
+    "SSL_CERT_FILE",
+    "SSL_CERT_DIR",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "NO_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "no_proxy",
+)
+
 
 def _user() -> pwd.struct_passwd:
     """
@@ -252,6 +274,26 @@ class Plugin:
             #
             "QT_QPA_PLATFORM": "offscreen",
         }
+
+        #
+        # A built environment is deliberate - inheriting root's would
+        # send the command looking in the wrong places. But the network
+        # is configured through the environment and nowhere else, so
+        # dropping these makes a plugin that cannot reach a cloud
+        # provider on a network the terminal handles fine.
+        #
+        # It matters on any network that inspects TLS, where the
+        # intercepting authority is trusted through SSL_CERT_FILE
+        # rather than being in the default store. University and
+        # workplace networks commonly do this.
+        #
+
+        for name in PASSED_THROUGH:
+
+            value = os.environ.get(name)
+
+            if value:
+                environment[name] = value
 
         def become_user() -> None:
             """

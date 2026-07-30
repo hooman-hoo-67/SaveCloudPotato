@@ -52,6 +52,20 @@ Nothing in the backend raises. Gaming Mode has nowhere to show a
 traceback, so timeouts, crashes, silence and non-JSON prose all come
 back as documents the panel can render.
 
+The environment is built rather than inherited, since root's would send
+the command looking in the wrong places. `SSL_CERT_FILE`, `SSL_CERT_DIR`
+and the proxy variables are carried across anyway: certificate trust is
+configured through the environment and nowhere else, and dropping it
+would mean a Deck that syncs fine from a terminal failing from the
+panel with a certificate error and no obvious cause. That matters on any
+network that inspects TLS, which university and workplace networks
+commonly do.
+
+Those have to be set where **Decky** sees them - a shell profile is read
+by your terminal, not by a system service. Installing the intercepting
+authority into the system trust store instead needs no variables at all,
+and is the better fix where it survives updates.
+
 The backend is covered by `tests/test_decky.py` in the repository root.
 The React side can be type-checked and built anywhere, but only a real
 Deck can tell you it looks right.
