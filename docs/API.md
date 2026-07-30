@@ -403,6 +403,12 @@ Unreachable storage does not prevent playing. The session is captured
 into the library and marked pending, and the next successful sync
 uploads it.
 
+Only the current save is uploaded when a session ends, because that is
+when someone is waiting for it. Version history is sent at the next
+launch, in the background once the game is running. Remote history is
+therefore up to one session behind; the current save never is, and it
+is what another device downloads in order to continue.
+
 Every session is captured whatever the exit code. A game closed by
 Steam's Stop button or Gaming Mode's Exit Game is terminated with
 SIGTERM, which counts as an ordinary exit and publishes normally. Any

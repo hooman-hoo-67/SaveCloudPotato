@@ -656,7 +656,7 @@ class DropboxStorageBackend(BaseStorageBackend):
     # ------------------------------------------------------------------
 
     @classmethod
-    def upload(cls, game: Game) -> RemoteState:
+    def upload(cls, game: Game, history: bool = True) -> RemoteState:
         """
         Upload a game's library entry.
         """
@@ -690,7 +690,8 @@ class DropboxStorageBackend(BaseStorageBackend):
         # present remotely is already correct.
         #
 
-        cls._push_versions(client, game_id)
+        if history:
+            cls._push_versions(client, game_id)
 
         #
         # Registry documents, so another device can adopt the game.
@@ -986,6 +987,17 @@ class DropboxStorageBackend(BaseStorageBackend):
 
             if relative and relative not in wanted:
                 client.delete(full)
+
+    @classmethod
+    def push_history(
+        cls,
+        game_id: str,
+    ) -> None:
+        """
+        Upload version history and trim beyond the retention window.
+        """
+
+        cls._push_versions(cls.client(), game_id)
 
     @classmethod
     def _push_versions(

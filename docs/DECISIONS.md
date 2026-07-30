@@ -664,6 +664,62 @@ Accepted
 
 ---
 
+## History follows the session rather than ending it
+
+Date: 2026-07-29
+
+Context
+
+A session ended by uploading the current save and every version the
+library held that storage did not. Measured against the Dropbox fake
+with an 80ms round trip, history was 12 of 28 file transfers on a
+twelve-file save with one new version.
+
+The moment matters more than the fraction. `wrap` does not return
+until the upload finishes, and Steam shows the game as still running
+until it does - so that time is spent with someone waiting to get back
+to their desktop. At launch the game is already running and nobody is
+watching.
+
+Decision
+
+A session uploads the current save at exit, and sends history at the
+next launch on a background thread once the game has started.
+
+Measured: the exit upload went from 1.15s to 0.82s, so the wait ends
+29% sooner on a save that small. It scales with the number of files
+and with latency, which is where a Steam Deck on wireless lives.
+
+Consequences
+
+Remote history lags one session behind. The current save never does,
+and that is what another device downloads in order to continue
+playing - history is history. A device that dies before its next
+launch has published everything that matters and is missing one
+version of backup.
+
+The thread is joined before the session is captured. Two transfers
+writing the same remote paths would be a race nobody asked for, and
+joining costs nothing in the ordinary case because the transfer
+finished while the game was being played.
+
+A failed history transfer is recorded and dropped. History arriving
+late is not a reason to interfere with a session, and the next launch
+will try again.
+
+`savecloud sync` and `savecloud upload` still send history. Only the
+session path defers, because only the session path has someone waiting
+at the end of it.
+
+Storage backends gained `push_history`, which is what makes the two
+halves separable at all.
+
+Status
+
+Accepted
+
+---
+
 ## One writer per game, and no half-written documents
 
 Date: 2026-07-29

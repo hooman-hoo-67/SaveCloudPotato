@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 
 import signal
 import subprocess
+import threading
 
 from savecloud.launchers import LauncherRegistry
 from savecloud.services import journal
@@ -224,7 +225,17 @@ class AutoSyncService:
 
             process = LaunchService.launch(profile)
 
+            history = AutoSyncService._push_history_in_background(game)
+
             exit_code = LaunchService.wait(process)
+
+            #
+            # Finish the history transfer before capturing, so the two
+            # do not write the same remote paths at once.
+            #
+
+            if history is not None:
+                history.join()
 
             AutoSyncService.after_exit(game, exit_code, result)
 
@@ -282,11 +293,56 @@ class AutoSyncService:
 
             process = subprocess.Popen(argv)
 
+            history = AutoSyncService._push_history_in_background(game)
+
             exit_code = AutoSyncService._wait_forwarding_signals(process)
+
+            if history is not None:
+                history.join()
 
             AutoSyncService.after_exit(game, exit_code, result)
 
         return result
+
+    @staticmethod
+    def _push_history_in_background(game: Game) -> threading.Thread | None:
+        """
+        Send version history while the game runs.
+
+        Started after the game has launched, so the transfer happens
+        while someone is playing rather than while they are waiting to
+        stop. Returns the thread so the caller can wait for it before
+        capturing the session - two transfers writing the same remote
+        paths would be a race nobody asked for.
+
+        Failures are recorded and dropped. History arriving late is not
+        a reason to interfere with a session.
+        """
+
+        if not auto_sync_enabled(game):
+            return None
+
+        def push() -> None:
+
+            try:
+                SyncService.push_history(game)
+
+            except Exception as error:
+                log.info(
+                    "%s: history not uploaded this time: %s",
+                    game.manifest.game_id,
+                    error,
+                )
+
+        thread = threading.Thread(
+            target=push,
+            name=f"savecloud-history-{game.manifest.game_id}",
+            daemon=True,
+        )
+
+        thread.start()
+
+        return thread
 
     @staticmethod
     def _wait_forwarding_signals(
@@ -478,7 +534,14 @@ class AutoSyncService:
         #
 
         try:
-            SyncService.upload(game)
+            #
+            # The current save only. Someone is waiting to get back to
+            # their desktop, and history is not what another device
+            # needs in order to continue playing - it follows at the
+            # next launch, in the background.
+            #
+
+            SyncService.upload(game, history=False)
 
             result.uploaded = True
 

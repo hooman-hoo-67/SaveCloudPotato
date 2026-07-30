@@ -220,6 +220,7 @@ class FilesystemStorageBackend(BaseStorageBackend):
     def upload(
         cls,
         game: Game,
+        history: bool = True,
     ) -> RemoteState:
         """
         Upload a game's library entry.
@@ -250,7 +251,8 @@ class FilesystemStorageBackend(BaseStorageBackend):
         # present remotely is already correct and is not re-uploaded.
         #
 
-        cls._push_versions(game_id)
+        if history:
+            cls._push_versions(game_id)
 
         #
         # Synchronized registry documents. These are what allow another
@@ -425,6 +427,20 @@ class FilesystemStorageBackend(BaseStorageBackend):
             source,
             destination,
         )
+
+    @classmethod
+    def push_history(
+        cls,
+        game_id: str,
+    ) -> None:
+        """
+        Upload version history and trim what the window no longer
+        allows.
+        """
+
+        cls.ensure_game_directory(game_id)
+
+        cls._push_versions(game_id)
 
     @classmethod
     def _push_versions(

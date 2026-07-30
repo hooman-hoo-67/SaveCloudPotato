@@ -278,11 +278,43 @@ class SyncService:
         return True
 
     @staticmethod
+    def push_history(game: Game) -> None:
+        """
+        Send version history to storage.
+
+        Deliberately separable from `upload`. A session ends with
+        someone waiting to get back to their desktop, and history is
+        not what another device needs in order to continue - the
+        current save is. So the current save goes at once and history
+        follows when nobody is waiting for it.
+        """
+
+        game_id = game.manifest.game_id
+
+        backend = SyncService.require_backend()
+
+        with GameLock.hold(game_id, "uploading history"):
+
+            backend.push_history(game_id)
+
+        log.info("%s: history uploaded", game_id)
+
+    @staticmethod
     def upload(
         game: Game,
+        history: bool = True,
     ) -> None:
         """
         Capture this device's save and push it to the backend.
+
+        Parameters
+        ----------
+        game
+            Registered game.
+        history
+            Whether to send version history along with the current
+            save. A session sets this to False and sends history at the
+            next launch instead, when nobody is waiting on it.
         """
 
         game_id = game.manifest.game_id
@@ -304,7 +336,7 @@ class SyncService:
             remote = backend.state(game_id)
 
             if remote is None or remote.checksum != local or not backend.exists(game_id):
-                state = backend.upload(game)
+                state = backend.upload(game, history=history)
 
             else:
                 state = remote

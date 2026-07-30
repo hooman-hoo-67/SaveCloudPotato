@@ -146,6 +146,25 @@ class BaseStorageBackend(ABC):
 
     @classmethod
     @abstractmethod
+    def push_history(
+        cls,
+        game_id: str,
+    ) -> None:
+        """
+        Upload version history the backend does not already hold.
+
+        Separate from `upload` because the two are wanted at different
+        moments. The current save has to reach storage as soon as a
+        session ends, since it is what another device would download.
+        History is history: it can follow later, and following later
+        means it is not transferred while someone is waiting to get
+        back to their desktop.
+        """
+
+        raise NotImplementedError
+
+    @classmethod
+    @abstractmethod
     def prune(
         cls,
         game_id: str,
