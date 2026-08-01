@@ -181,6 +181,59 @@ def test_a_missing_path_entry_is_reported(home, appimage, monkeypatch):
     assert any("PATH" in warning for warning in result.warnings)
 
 
+def test_the_warning_names_the_file_a_terminal_reads(
+    home,
+    appimage,
+    monkeypatch,
+):
+    """
+    Not "your shell profile", which is a category rather than advice.
+
+    The obvious member of that category is the wrong one:
+    `~/.bash_profile` is read by login shells, and a terminal window
+    opens an interactive non-login shell that reads `~/.bashrc` and
+    never looks at the other. Reported from a Steam Deck, where
+    following the vaguer wording changed nothing.
+    """
+
+    monkeypatch.setenv("PATH", "/usr/bin")
+    monkeypatch.setenv("SHELL", "/bin/bash")
+
+    warning = "\n".join(integration.install().warnings)
+
+    assert "~/.bashrc" in warning
+    assert ".bash_profile" not in warning
+
+
+def test_the_warning_speaks_the_shell_being_used(home, appimage, monkeypatch):
+    """
+    fish does not have `export`, so naming its file is not enough.
+    """
+
+    monkeypatch.setenv("PATH", "/usr/bin")
+    monkeypatch.setenv("SHELL", "/usr/bin/fish")
+
+    warning = "\n".join(integration.install().warnings)
+
+    assert "config.fish" in warning
+    assert "fish_add_path" in warning
+    assert "export PATH" not in warning
+
+
+def test_an_unknown_shell_still_gets_usable_advice(
+    home,
+    appimage,
+    monkeypatch,
+):
+
+    monkeypatch.setenv("PATH", "/usr/bin")
+    monkeypatch.setenv("SHELL", "/bin/something-else")
+
+    warning = "\n".join(integration.install().warnings)
+
+    assert "~/.bashrc" in warning
+
+
 def test_a_present_path_entry_is_not_reported(home, appimage, monkeypatch):
 
     monkeypatch.setenv("PATH", f"{integration.BIN}{os.pathsep}/usr/bin")

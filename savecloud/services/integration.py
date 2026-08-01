@@ -123,10 +123,13 @@ def install() -> IntegrationResult:
         )
 
     if not _on_path(BIN):
+
+        profile, line = _shell_profile()
+
         warnings.append(
             f"{BIN} is not on your PATH, so `savecloud` will not be "
-            f"found in a terminal until it is. Add this to your shell "
-            f"profile:\n    export PATH=\"$HOME/.local/bin:$PATH\""
+            f"found in a terminal until it is. Add this to {profile}, "
+            f"then open a new terminal:\n    {line}"
         )
 
     #
@@ -207,6 +210,41 @@ def _on_path(directory: Path) -> bool:
     entries = os.environ.get("PATH", "").split(os.pathsep)
 
     return any(entry and Path(entry) == directory for entry in entries)
+
+
+#
+# Where a new terminal reads its settings, and how that shell spells
+# extending PATH.
+#
+# "your shell profile" is a category rather than advice, and the
+# obvious member of it is usually the wrong one: `~/.bash_profile` is
+# read by login shells, while a terminal window opens an interactive
+# non-login shell that reads `~/.bashrc` and never looks at the other.
+# Someone following the vaguer wording edits the file nothing consults,
+# opens a new terminal, and sees no change.
+#
+# fish is not merely a different file - `export` is not its syntax at
+# all, so naming the file without the line would still not work.
+#
+
+PROFILES = {
+    "bash": ("~/.bashrc", 'export PATH="$HOME/.local/bin:$PATH"'),
+    "zsh": ("~/.zshrc", 'export PATH="$HOME/.local/bin:$PATH"'),
+    "fish": (
+        "~/.config/fish/config.fish",
+        "fish_add_path ~/.local/bin",
+    ),
+}
+
+
+def _shell_profile() -> tuple[str, str]:
+    """
+    The file a new terminal will read, and the line to put in it.
+    """
+
+    shell = Path(os.environ.get("SHELL", "")).name
+
+    return PROFILES.get(shell, PROFILES["bash"])
 
 
 def _desktop_entry(executable: Path) -> str:
