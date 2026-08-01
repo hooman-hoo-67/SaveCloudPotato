@@ -20,9 +20,14 @@ from savecloud.utils.executable import savecloud_executable
 
 #
 # Where a user-level installation goes on Linux. Not chosen: this is
-# the XDG layout every desktop already looks in, and `~/.local/bin` is
-# on PATH by default on the distributions SaveCloud targets, SteamOS
-# among them.
+# the XDG layout every desktop already looks in.
+#
+# It is not necessarily on PATH, which is why `install` checks and says
+# so rather than assuming. SteamOS is the case that matters and the
+# case that fails - a Steam Deck does not put `~/.local/bin` on PATH,
+# so `savecloud` in Konsole finds nothing until a shell profile is
+# edited. Steam launch options are unaffected: those name the file
+# absolutely and are not run through a login shell.
 #
 
 BIN = Path.home() / ".local" / "bin"

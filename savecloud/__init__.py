@@ -11,4 +11,10 @@ Steam Cloud for everything.
 # include, and which an AppImage has no reason to.
 #
 
-__version__ = "0.1.0b1"
+#
+# Bump this before tagging. The release workflow refuses a tag that
+# disagrees with it, because a build that misreports its own version
+# is worse than one carrying none - the wrong answer gets believed.
+#
+
+__version__ = "0.1.0b6"

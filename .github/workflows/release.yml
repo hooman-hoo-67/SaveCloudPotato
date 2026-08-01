@@ -44,6 +44,29 @@ jobs:
           echo "APPIMAGETOOL=$PWD/squashfs-root/AppRun" >> "$GITHUB_ENV"
 
       #
+      # A build that misreports its own version is worse than one with
+      # no version at all, because the wrong answer is believed. Every
+      # release from v0.1.0b2 to v0.1.0b5 called itself 0.1.0b1, which
+      # made `savecloud --version` - and the build the Decky panel
+      # shows - useless for telling any of them apart.
+      #
+      # So the tag has to agree with the code. Failing here costs a
+      # retag; not failing here ships a binary that lies.
+      #
+
+      - name: Version matches the tag
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          declared="v$(python -c 'import savecloud; print(savecloud.__version__)')"
+          if [ "$declared" != "${{ github.ref_name }}" ]; then
+            echo "Tag ${{ github.ref_name }} does not match" \
+                 "savecloud.__version__, which says $declared."
+            echo "Bump savecloud/__init__.py, then retag."
+            exit 1
+          fi
+          echo "$declared"
+
+      #
       # Qt's runtime libraries, which a runner does not have. PySide6
       # installs from a wheel either way, but importing QtWidgets links
       # libEGL - so without these the interface tests skip themselves,
