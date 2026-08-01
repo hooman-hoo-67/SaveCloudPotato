@@ -718,7 +718,13 @@ class DropboxStorageBackend(BaseStorageBackend):
         state = RemoteState.create(
             game_id=game_id,
             checksum=hash_directory(source),
-            version=game.runtime.current_version,
+            #
+            # The library's count, not the runtime's - see the same
+            # call in the filesystem backend.
+            #
+            version=SaveCloudLibrary.load_library_metadata(
+                game_id
+            ).latest_version,
             device_id=game.runtime.last_device or "",
             device_name=SaveCloudLibrary.device_name(),
         )

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import typer
 
+from savecloud.services.library import SaveCloudLibrary
 from savecloud.services.save import SaveService
 from savecloud.utils import output
 from savecloud.utils.output import require_game
@@ -30,7 +31,15 @@ def history(
             {
                 "ok": True,
                 "game_id": game.manifest.game_id,
-                "current_version": game.runtime.current_version,
+                #
+                # Which version is restored, from the library that
+                # tracks it. The runtime's field of the same name is
+                # written at registration and never advanced, so this
+                # reported 0 no matter which version was in place.
+                #
+                "current_version": SaveCloudLibrary.load_library_metadata(
+                    game.manifest.game_id
+                ).current_version,
                 "versions": versions,
             }
         )

@@ -284,7 +284,17 @@ class FilesystemStorageBackend(BaseStorageBackend):
         state = RemoteState.create(
             game_id=game_id,
             checksum=hash_directory(source),
-            version=game.runtime.current_version,
+            #
+            # The library's count, not the runtime's. `GameRuntime`
+            # carries a `current_version` that is written once at
+            # registration and never advanced, so reading it here
+            # stamped every upload as version 0 - and a zero renders as
+            # no version at all, which is why a conflict could describe
+            # the remote save without saying which version it was.
+            #
+            version=SaveCloudLibrary.load_library_metadata(
+                game_id
+            ).latest_version,
             device_id=game.runtime.last_device or "",
             device_name=SaveCloudLibrary.device_name(),
         )
