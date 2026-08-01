@@ -44,11 +44,31 @@ jobs:
           echo "APPIMAGETOOL=$PWD/squashfs-root/AppRun" >> "$GITHUB_ENV"
 
       #
+      # Qt's runtime libraries, which a runner does not have. PySide6
+      # installs from a wheel either way, but importing QtWidgets links
+      # libEGL - so without these the interface tests skip themselves,
+      # and a gate that quietly covers none of the interface is worse
+      # than no gate, because it reads as though it did.
+      #
+
+      - name: Qt runtime libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            libegl1 libgl1 libxkbcommon0 libdbus-1-3 libfontconfig1
+
+      #
       # A release that ships code nobody ran the tests against is the
       # thing this workflow exists to prevent. Cheap enough to gate on.
       #
 
       - name: Test
+        env:
+          #
+          # There is no display. The interface tests render into an
+          # offscreen surface, which is what they do locally too.
+          #
+          QT_QPA_PLATFORM: offscreen
         run: |
           pip install -e ".[dev]"
           python -m pytest -q

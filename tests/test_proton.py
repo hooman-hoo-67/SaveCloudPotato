@@ -13,7 +13,16 @@ import pytest
 
 from savecloud.gui.facade import GuiFacade
 
-pytest.importorskip("PySide6.QtWidgets")
+#
+# `exc_type` because PySide6 can be installed and still not import:
+# QtWidgets links libEGL, which a headless machine need not have. That
+# raises ImportError rather than ModuleNotFoundError, and since pytest
+# 8.2 a bare importorskip re-raises those on the grounds that they
+# usually mean a broken install rather than an absent one. Here it
+# means neither - it means no display libraries, which is exactly when
+# these tests should step aside.
+#
+pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
 
 
 @pytest.fixture

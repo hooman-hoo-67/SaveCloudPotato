@@ -16,7 +16,10 @@ from savecloud.services.sync import SyncService
 
 from tests.conftest import GAME_ID, register_game, write_save
 
-facade_module = pytest.importorskip("savecloud.gui.facade")
+facade_module = pytest.importorskip(
+    "savecloud.gui.facade",
+    exc_type=ImportError,
+)
 
 GuiFacade = facade_module.GuiFacade
 
@@ -187,7 +190,10 @@ def qt_app(monkeypatch):
 
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
 
-    QtWidgets = pytest.importorskip("PySide6.QtWidgets")
+    QtWidgets = pytest.importorskip(
+        "PySide6.QtWidgets",
+        exc_type=ImportError,
+    )
 
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
 

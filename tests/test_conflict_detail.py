@@ -274,7 +274,7 @@ def test_the_dialog_buttons_name_the_devices(registered_game, working_save):
     save" only says where it happens to live.
     """
 
-    pytest.importorskip("PySide6.QtWidgets")
+    pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
 
     from savecloud.gui.window import _side
 
