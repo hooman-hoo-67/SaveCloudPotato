@@ -70,32 +70,39 @@ The backend is covered by `tests/test_decky.py` in the repository root.
 The React side can be type-checked and built anywhere, but only a real
 Deck can tell you it looks right.
 
-## Building
+## Installing
+
+Take `SaveCloud-decky-plugin.zip` from a release. It is built by the
+same workflow run as the AppImage beside it, from the same commit -
+which matters, because a plugin and a command line from different
+commits is the usual cause of a panel that loads but behaves oddly.
 
 ```
-npm install
+unzip SaveCloud-decky-plugin.zip
+sudo cp -r SaveCloud ~/homebrew/plugins/
+sudo systemctl restart plugin_loader
+```
+
+The directory has to be called `SaveCloud`, matching `name` in
+`plugin.json`. Decky keys the frontend to its backend on that name, so a
+renamed directory loads as a plugin that cannot talk to itself.
+
+## Building it yourself
+
+```
+npm ci
 npm run build
 ```
 
 That produces `dist/index.js`. `npm run typecheck` checks the frontend
-without building it.
+without building it - `npm run build` does not fail on type errors, so
+CI runs the two separately.
 
-## Installing by hand
+A Steam Deck cannot do this: SteamOS ships no Node and its `/usr` is
+read-only. Build on another machine and copy `plugin.json`,
+`package.json`, `main.py` and `dist/index.js` across as
+`~/homebrew/plugins/SaveCloud`.
 
-Decky loads plugins from `~/homebrew/plugins`. A plugin directory needs
-the manifest, the backend and the built bundle:
-
-```
-SaveCloud/
-  plugin.json
-  package.json
-  main.py
-  dist/index.js
-```
-
-Copy those onto the Deck as `~/homebrew/plugins/SaveCloud`, then restart
-Decky:
-
-```
-sudo systemctl restart plugin_loader
-```
+Note that `~/homebrew/plugins` is root-owned, since Decky runs as root.
+If a copied plugin does not appear, `~/homebrew/logs/plugin_loader.log`
+is Decky's own log and will say why - it is not the same as SaveCloud's.

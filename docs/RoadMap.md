@@ -135,6 +135,7 @@ compatibility of a Proton save has not been tested.
 - [x] sync one game, sync everything
 - [x] conflict resolution with both saves described
 - [x] recent log lines
+- [x] built and released alongside the AppImage
 - [ ] verified on a Steam Deck
 
 SaveCloud in Gaming Mode. See `decky/README.md`.
@@ -159,6 +160,17 @@ a save folder are not controller work.
 
 The backend is tested; the React side is type-checked and built, which
 is not the same as verified. It has not run on a Deck.
+
+A tag now produces the plugin zip and the AppImage from one workflow
+run, so the two are always from the same commit. That was not tidiness:
+the plugin cannot be built on a Deck at all - SteamOS ships no Node and
+its `/usr` is read-only - so every test meant an npm build on another
+machine and copying four files over SSH, which is exactly how a Deck
+ends up running a plugin built from a different commit than the command
+line it drives.
+
+The release is also gated on the test suite now. It was not before, and
+`v0.1.0b2` shipped without anything having run it.
 
 ### Not planned
 

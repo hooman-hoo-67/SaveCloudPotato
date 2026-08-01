@@ -43,6 +43,16 @@ jobs:
           ./appimagetool --appimage-extract > /dev/null
           echo "APPIMAGETOOL=$PWD/squashfs-root/AppRun" >> "$GITHUB_ENV"
 
+      #
+      # A release that ships code nobody ran the tests against is the
+      # thing this workflow exists to prevent. Cheap enough to gate on.
+      #
+
+      - name: Test
+        run: |
+          pip install -e ".[dev]"
+          python -m pytest -q
+
       - name: Build
         run: packaging/build-appimage.sh
 
@@ -97,13 +107,77 @@ jobs:
           name: SaveCloud-windows-x86_64
           path: SaveCloud-windows-x86_64.zip
 
-  release:
+  plugin:
     #
-    # Linux only. Windows runs alongside and its artifact is collected
-    # if it finished, but the release does not wait on it.
+    # The Decky plugin, assembled the way it has to land on a Deck.
+    #
+    # Built here because a Steam Deck cannot build it: SteamOS ships no
+    # Node and its /usr is read-only. Doing it by hand meant an npm
+    # build and copying four things over SSH for every test, which is
+    # how a Deck ends up running a plugin built from a different commit
+    # than the AppImage beside it.
     #
 
-    needs: [linux]
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: decky/package-lock.json
+
+      - name: Install
+        working-directory: decky
+        run: npm ci
+
+      #
+      # Separately from the build, which does not fail on type errors.
+      #
+
+      - name: Type-check
+        working-directory: decky
+        run: npm run typecheck
+
+      - name: Build
+        working-directory: decky
+        run: npm run build
+
+      #
+      # Decky keys the frontend to its backend on the plugin's name, so
+      # the directory has to match plugin.json exactly - a zip that
+      # unpacks to the wrong name loads as a plugin that cannot talk to
+      # itself.
+      #
+      # The sourcemap is left out. It is ninety times the size of the
+      # bundle, and nothing on a Deck reads it.
+      #
+
+      - name: Assemble
+        run: |
+          NAME=$(python -c 'import json;print(json.load(open("decky/plugin.json"))["name"])')
+          mkdir -p "package/$NAME/dist"
+          cp decky/plugin.json decky/package.json decky/main.py "package/$NAME/"
+          cp decky/dist/index.js "package/$NAME/dist/"
+          (cd package && zip -r ../SaveCloud-decky-plugin.zip "$NAME")
+          unzip -l SaveCloud-decky-plugin.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SaveCloud-decky-plugin
+          path: SaveCloud-decky-plugin.zip
+
+  release:
+    #
+    # Linux and the plugin. Windows runs alongside and its artifact is
+    # collected if it finished, but the release does not wait on it -
+    # unlike the plugin, which is exercised on every run and so is worth
+    # failing a release over.
+    #
+
+    needs: [linux, plugin]
 
     if: startsWith(github.ref, 'refs/tags/')
 
@@ -151,6 +225,27 @@ jobs:
 
             `savecloud doctor -v` prints the correct line for your
             machine.
+
+            ## Steam Deck: Gaming Mode
+
+            `SaveCloud-decky-plugin.zip` is a
+            [Decky Loader](https://decky.xyz) plugin for checking,
+            synchronizing and resolving conflicts without leaving Gaming
+            Mode. Install the AppImage first and run `savecloud install`,
+            which is where the plugin looks for it.
+
+            ```
+            unzip SaveCloud-decky-plugin.zip
+            sudo cp -r SaveCloud ~/homebrew/plugins/
+            sudo systemctl restart plugin_loader
+            ```
+
+            The plugin and the AppImage in this release are built from
+            the same commit. Mixing versions is the usual cause of a
+            panel that loads but behaves oddly - the plugin's "Recent
+            activity" row reports which build it found.
+
+            Registering games stays in Desktop Mode.
 
             ## Reporting a problem
 
