@@ -17,6 +17,7 @@ from savecloud.models.game import (
 from savecloud.services.device import DeviceService
 from savecloud.services.library import SaveCloudLibrary
 from savecloud.services.registry import RegistryService
+from savecloud.utils.identifiers import InvalidGameIdError, validate_game_id
 from savecloud.utils.prompt import choose_enum, choose_option, prompt_required
 
 
@@ -28,6 +29,20 @@ def register() -> None:
     display_name = prompt_required("Display name")
 
     game_id = prompt_required("Game ID")
+
+    #
+    # Before anything else is asked. An ID names a folder, and finding
+    # that out after choosing an adapter and locating a save directory
+    # would throw away everything already typed.
+    #
+
+    try:
+        validate_game_id(game_id)
+
+    except InvalidGameIdError as error:
+        typer.secho(str(error), fg=typer.colors.RED)
+
+        raise typer.Exit(code=1)
 
     #
     # Fail before asking anything else if the game already exists.

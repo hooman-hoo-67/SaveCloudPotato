@@ -27,6 +27,7 @@ from savecloud.models.game import (
     SyncStatus,
 )
 from savecloud.utils.atomic import write_json
+from savecloud.utils.identifiers import validate_game_id
 
 
 class RegistryService:
@@ -56,7 +57,20 @@ class RegistryService:
     def create_registry(game: Game) -> None:
         """
         Create a registry for a game.
+
+        Raises
+        ------
+        InvalidGameIdError
+            If the ID cannot be used as a directory name.
         """
+
+        #
+        # Checked here rather than when loading, so a library that
+        # already holds a badly named entry still opens. Refusing to
+        # read one would turn a bad name into unreachable save data.
+        #
+
+        validate_game_id(game.manifest.game_id)
 
         RegistryService.registry_directory(game.manifest.game_id).mkdir(
             parents=True, exist_ok=True
