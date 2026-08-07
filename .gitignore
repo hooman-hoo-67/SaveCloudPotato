@@ -12,6 +12,12 @@ dist/
 build/
 *.egg-info/
 
+# Build tooling fetched on demand rather than checked in. Both the
+# release workflow and packaging/build-appimage.sh leave these in the
+# repository root, so every local build produces the same clutter.
+appimagetool*
+squashfs-root/
+
 # Decky plugin frontend. The lock file is committed: a plugin that ships
 # a built bundle should build the same way twice.
 node_modules/
