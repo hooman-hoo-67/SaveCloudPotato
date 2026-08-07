@@ -223,7 +223,14 @@ class FakeDropbox:
     # Transport
     # ------------------------------------------------------------------
 
-    def post_form(self, url, fields, headers=None, timeout=None) -> dict:
+    def post_form(
+        self,
+        url,
+        fields,
+        headers=None,
+        timeout=None,
+        attempts=None,
+    ) -> dict:
         """
         Stand in for the OAuth token endpoint.
         """
@@ -260,7 +267,14 @@ class FakeDropbox:
 
         raise AssertionError(f"Unexpected grant: {fields}")
 
-    def post_json(self, url, payload, headers=None, timeout=None) -> dict:
+    def post_json(
+        self,
+        url,
+        payload,
+        headers=None,
+        timeout=None,
+        attempts=None,
+    ) -> dict:
         """
         Stand in for the JSON endpoints.
         """
@@ -280,7 +294,15 @@ class FakeDropbox:
 
         return handlers[endpoint](payload or {})
 
-    def request(self, url, data=None, headers=None, method="POST", timeout=None):
+    def request(
+        self,
+        url,
+        data=None,
+        headers=None,
+        method="POST",
+        timeout=None,
+        attempts=None,
+    ):
         """
         Stand in for the content endpoints.
         """

@@ -893,10 +893,10 @@ def test_a_reachability_probe_is_not_paid_twice(dropbox, monkeypatch):
     would double the wait in front of someone trying to play.
     """
 
-    attempts = []
+    probes = []
 
-    def unreachable(url, fields, timeout=30):
-        attempts.append(timeout)
+    def unreachable(url, fields, timeout=30, attempts=None):
+        probes.append(timeout)
 
         raise http.HttpError(0, "network is unreachable", url)
 
@@ -910,7 +910,7 @@ def test_a_reachability_probe_is_not_paid_twice(dropbox, monkeypatch):
 
     assert "could not be reached" in reason
 
-    assert len(attempts) == 1
+    assert len(probes) == 1
 
 
 def test_the_probe_uses_a_short_timeout(dropbox, monkeypatch):
@@ -920,7 +920,7 @@ def test_the_probe_uses_a_short_timeout(dropbox, monkeypatch):
 
     seen = []
 
-    def unreachable(url, fields, timeout=30):
+    def unreachable(url, fields, timeout=30, attempts=None):
         seen.append(timeout)
 
         raise http.HttpError(0, "network is unreachable", url)

@@ -160,6 +160,7 @@ class DropboxClient:
     def access_token(
         self,
         timeout: int = http.DEFAULT_TIMEOUT,
+        attempts: int = http.RETRY_ATTEMPTS,
     ) -> str:
         """
         Return a usable access token, refreshing it if necessary.
@@ -169,14 +170,19 @@ class DropboxClient:
         timeout
             Seconds to wait. A reachability probe passes a short one,
             since it is only asking whether Dropbox answers at all.
+        attempts
+            How many times to wait out a rate limit. A probe passes 1:
+            being told to slow down already answers the only question
+            it asked, and a launch is waiting on the reply.
         """
 
         with self._token_lock:
-            return self._refresh_if_needed(timeout)
+            return self._refresh_if_needed(timeout, attempts)
 
     def _refresh_if_needed(
         self,
         timeout: int,
+        attempts: int = http.RETRY_ATTEMPTS,
     ) -> str:
         """
         Return the cached token, refreshing it once if it has expired.
@@ -194,6 +200,7 @@ class DropboxClient:
                 "client_secret": self.app_secret,
             },
             timeout=timeout,
+            attempts=attempts,
         )
 
         token = response.get("access_token")
@@ -519,7 +526,10 @@ class DropboxStorageBackend(BaseStorageBackend):
         """
 
         try:
-            cls.client().access_token(timeout=http.PROBE_TIMEOUT)
+            cls.client().access_token(
+                timeout=http.PROBE_TIMEOUT,
+                attempts=1,
+            )
 
         except Exception as error:
             cls._probe_failure = error
@@ -546,7 +556,10 @@ class DropboxStorageBackend(BaseStorageBackend):
             if cls._probe_failure is not None:
                 raise cls._probe_failure
 
-            cls.client().access_token(timeout=http.PROBE_TIMEOUT)
+            cls.client().access_token(
+                timeout=http.PROBE_TIMEOUT,
+                attempts=1,
+            )
 
         except DropboxError as error:
             return str(error)
