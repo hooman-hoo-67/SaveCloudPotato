@@ -14,7 +14,22 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from savecloud.utils.certificates import ensure_trust_store
 from savecloud.utils.progress import report
+
+#
+# Done at import, before any context is built. A frozen build carries
+# the build machine's certificate paths, and on a distribution that
+# keeps them elsewhere - SteamOS, where the AppImage runs - that left
+# no trusted authorities at all. Every request failed, with a message
+# that reads like a network intercepting TLS.
+#
+# Here rather than at each entry point because this module is the one
+# thing every HTTPS request passes through, and an entry point that
+# forgot to call it would fail in a way nobody would connect to this.
+#
+
+ensure_trust_store()
 
 DEFAULT_TIMEOUT = 30
 
