@@ -514,6 +514,17 @@ class MainWindow(QMainWindow):
 
             return
 
+        #
+        # Conflicts found while synchronizing everything. Each is the
+        # same question a single sync asks, so each is asked the same
+        # way rather than reported as a failure with nothing to press.
+        #
+
+        if outcome.conflicts:
+            self._resolve_conflicts(outcome)
+
+            return
+
         if not outcome.ok:
             QMessageBox.warning(self, "SaveCloud", outcome.message)
 
@@ -842,14 +853,17 @@ class MainWindow(QMainWindow):
 
         QMessageBox.information(self, "SaveCloud", dialog.outcome.message)
 
-    def _resolve_conflict(self, outcome) -> None:
+    def _ask_conflict(self, game_id: str, local, remote) -> str | None:
         """
-        Ask which side to keep.
+        Ask which side to keep, and return the answer.
 
         The one dialog the whole design exists to make possible: both
         sides hold real play time, and only the person who played knows
         which matters. Whichever loses is kept as a version, which is
         what makes offering the choice safe rather than final.
+
+        Returns "keep-local", "keep-remote", or None for deciding
+        later.
         """
 
         box = QMessageBox(self)
@@ -857,7 +871,7 @@ class MainWindow(QMainWindow):
         box.setWindowTitle("Both sides changed")
 
         box.setText(
-            f"{outcome.game_id} has changed on this device and in "
+            f"{game_id} has changed on this device and in "
             f"storage since they last agreed."
         )
 
@@ -870,7 +884,7 @@ class MainWindow(QMainWindow):
 
         details = [
             summary.description
-            for summary in (outcome.local, outcome.remote)
+            for summary in (local, remote)
             if summary is not None
         ]
 
@@ -882,12 +896,12 @@ class MainWindow(QMainWindow):
         )
 
         keep_local = box.addButton(
-            f"Keep {_side(outcome.local, 'this device')}",
+            f"Keep {_side(local, 'this device')}",
             QMessageBox.AcceptRole,
         )
 
         keep_remote = box.addButton(
-            f"Keep {_side(outcome.remote, 'the remote')}",
+            f"Keep {_side(remote, 'the remote')}",
             QMessageBox.DestructiveRole,
         )
 
@@ -898,10 +912,83 @@ class MainWindow(QMainWindow):
         clicked = box.clickedButton()
 
         if clicked is keep_local:
-            self._sync("keep-local")
+            return "keep-local"
 
-        elif clicked is keep_remote:
-            self._sync("keep-remote")
+        if clicked is keep_remote:
+            return "keep-remote"
+
+        return None
+
+    def _resolve_conflict(self, outcome) -> None:
+        """
+        Ask about one conflict, and act on the answer.
+        """
+
+        choice = self._ask_conflict(
+            outcome.game_id,
+            outcome.local,
+            outcome.remote,
+        )
+
+        if choice is None:
+            return
+
+        #
+        # Named rather than taken from the selection. The dialog is
+        # modal but the list is rebuilt by the refresh that precedes
+        # it, and resolving whichever game happens to be selected
+        # afterwards is not what was asked.
+        #
+
+        game_id = outcome.game_id
+
+        self._run(
+            lambda: self.facade.sync(game_id, choice),
+            f"Resolving {game_id}…",
+        )
+
+    def _resolve_conflicts(self, outcome) -> None:
+        """
+        Ask about every conflict a whole-library sync turned up.
+
+        All the questions first, then one wait. Someone shown three
+        conflicts answers three times; making them wait for a transfer
+        between each would be a worse way to ask the same thing.
+        """
+
+        decisions = {}
+
+        for conflict in outcome.conflicts:
+
+            choice = self._ask_conflict(
+                conflict.game_id,
+                conflict.local,
+                conflict.remote,
+            )
+
+            if choice is not None:
+                decisions[conflict.game_id] = choice
+
+        #
+        # Anything that failed for a reason other than a conflict still
+        # has to be reported; declining every conflict leaves that as
+        # the only thing worth saying.
+        #
+
+        if not decisions:
+
+            if not outcome.ok and outcome.message:
+                self.statusBar().showMessage(
+                    outcome.message.split("\n")[0],
+                    8000,
+                )
+
+            return
+
+        self._run(
+            lambda: self.facade.resolve_conflicts(decisions),
+            f"Resolving {len(decisions)}…",
+        )
 
     # ------------------------------------------------------------------
     # Reading

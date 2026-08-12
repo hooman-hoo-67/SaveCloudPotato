@@ -967,11 +967,41 @@ class DropboxSetupDialog(_Form):
 
         self.authorize_button.clicked.connect(self._authorize)
 
+        #
+        # The same link the button opens, shown rather than only
+        # followed. `webbrowser.open` reports nothing useful and does
+        # nothing at all on a machine with no browser it can reach - a
+        # Deck in Gaming Mode, a sandboxed build, anything headless -
+        # and someone in that position is left with a button that
+        # visibly did not work and no way round it.
+        #
+        # Read-only rather than disabled, so the text can still be
+        # selected and copied.
+        #
+
+        self.authorize_link = QLineEdit()
+
+        self.authorize_link.setReadOnly(True)
+
+        self.authorize_link.setPlaceholderText(
+            "The link appears here once an app key is entered"
+        )
+
+        self.copy_button = QPushButton("Copy link")
+
+        self.copy_button.clicked.connect(self._copy_link)
+
+        self.copy_button.setEnabled(False)
+
         self.form.addRow("App key", self.app_key)
 
         self.form.addRow("App secret", self.app_secret)
 
         self.form.addRow("", self.authorize_button)
+
+        self.form.addRow("Or open by hand", self.authorize_link)
+
+        self.form.addRow("", self.copy_button)
 
         self.form.addRow("Authorization code", self.code)
 
@@ -979,6 +1009,22 @@ class DropboxSetupDialog(_Form):
             "Create an app at dropbox.com/developers, then paste its "
             "key and secret above."
         )
+
+    def _copy_link(self) -> None:
+        """
+        Put the authorization link on the clipboard.
+        """
+
+        from PySide6.QtWidgets import QApplication
+
+        link = self.authorize_link.text()
+
+        if not link:
+            return
+
+        QApplication.clipboard().setText(link)
+
+        self.complain("Link copied. Open it in any browser.")
 
     def _authorize(self) -> None:
 
@@ -991,11 +1037,40 @@ class DropboxSetupDialog(_Form):
 
             return
 
-        webbrowser.open(outcome.value)
+        #
+        # Shown before it is opened, so the link is there whether or
+        # not a browser appears.
+        #
+
+        self.authorize_link.setText(outcome.value)
+
+        self.copy_button.setEnabled(True)
+
+        opened = False
+
+        try:
+            opened = webbrowser.open(outcome.value)
+
+        except Exception:
+            #
+            # A missing browser is not a failure of the setup, and it
+            # is recoverable by reading the link above.
+            #
+
+            opened = False
+
+        if opened:
+            self.complain(
+                "Approve the request in your browser, then paste the "
+                "code it shows into the field below. Each code works "
+                "once."
+            )
+
+            return
 
         self.complain(
-            "Approve the request in your browser, then paste the code "
-            "it shows into the field below. Each code works once."
+            "No browser could be opened. Copy the link above, approve "
+            "the request wherever you can, then paste the code below."
         )
 
     def attempt(self):

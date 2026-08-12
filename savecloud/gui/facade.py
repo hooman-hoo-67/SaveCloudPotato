@@ -75,6 +75,31 @@ class Outcome:
     local: object | None = None
     remote: object | None = None
 
+    #
+    # Conflicts found by an action covering several games. One
+    # synchronization can turn up more than one, and each is its own
+    # question - so they travel as a list rather than collapsing into
+    # the single-conflict fields above, which describe one game.
+    #
+
+    conflicts: list = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class Conflict:
+    """
+    One game that changed on both sides, and what each side looks like.
+
+    Carried out of an action that covered several games, so the
+    interface can ask about each in turn rather than reporting a
+    number.
+    """
+
+    game_id: str
+
+    local: object | None = None
+    remote: object | None = None
+
 
 @dataclass(slots=True)
 class AdapterChoice:
@@ -481,18 +506,98 @@ class GuiFacade:
             if not isinstance(outcome, SyncAction)
         }
 
-        if failures:
+        #
+        # A conflict here is the same question a single sync asks, and
+        # has to be offered the same way. Reporting it among the
+        # failures would put the one thing the interface exists to
+        # resolve into a message box with nothing to press - which
+        # leaves the command line as the only way out, for a choice
+        # that is two buttons wide.
+        #
+
+        conflicts = [
+            Conflict(
+                game_id=game_id,
+                local=error.local,
+                remote=error.remote,
+            )
+            for game_id, error in sorted(failures.items())
+            if isinstance(error, SyncConflictError)
+        ]
+
+        broken = {
+            game_id: error
+            for game_id, error in failures.items()
+            if not isinstance(error, SyncConflictError)
+        }
+
+        if broken:
             return Outcome(
                 ok=False,
+                conflicts=conflicts,
                 message="\n".join(
                     f"{game_id}: {reason}"
-                    for game_id, reason in sorted(failures.items())
+                    for game_id, reason in sorted(broken.items())
+                ),
+            )
+
+        if conflicts:
+            return Outcome(
+                ok=False,
+                conflicts=conflicts,
+                message=(
+                    f"{len(conflicts)} "
+                    f"game{'s' if len(conflicts) != 1 else ''} changed on "
+                    f"both sides and need a decision."
                 ),
             )
 
         return Outcome(
             ok=True,
             message=f"Synchronized {len(results)} games.",
+        )
+
+    @staticmethod
+    def resolve_conflicts(decisions: dict) -> Outcome:
+        """
+        Apply a decision to each of several conflicted games.
+
+        Parameters
+        ----------
+        decisions
+            Game ID to "keep-local" or "keep-remote".
+
+        Taken together rather than one at a time because they are
+        answered together: someone shown three conflicts chooses three
+        times, and then waits once.
+        """
+
+        if not decisions:
+            return Outcome(ok=True, message="Nothing to resolve.")
+
+        resolved = 0
+
+        failures = []
+
+        for game_id, resolution in sorted(decisions.items()):
+
+            outcome = GuiFacade.sync(game_id, resolution)
+
+            if outcome.ok:
+                resolved += 1
+
+            else:
+                failures.append(f"{game_id}: {outcome.message}")
+
+        if failures:
+            return Outcome(ok=False, message="\n".join(failures))
+
+        return Outcome(
+            ok=True,
+            message=(
+                f"Resolved {resolved} "
+                f"conflict{'s' if resolved != 1 else ''}."
+            ),
         )
 
     @staticmethod
