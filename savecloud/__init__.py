@@ -17,4 +17,4 @@ Steam Cloud for everything.
 # is worse than one carrying none - the wrong answer gets believed.
 #
 
-__version__ = "0.1.0b6"
+__version__ = "0.1.0b7"
