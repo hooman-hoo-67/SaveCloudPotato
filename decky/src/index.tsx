@@ -54,31 +54,53 @@ const Content: FC = () => {
   const [states, setStates] = useState<Record<string, CheckRow>>({});
   const [busy, setBusy] = useState<Busy>(null);
 
+  //
+  // Set when the bridge to the backend itself fails, as opposed to the
+  // backend answering with a failure. Those are different problems and
+  // only one of them has anything to do with SaveCloud.
+  //
+  const [broken, setBroken] = useState<string | null>(null);
+
   /**
    * Re-read everything the panel shows.
    *
    * The three questions are independent, so they go out together - the
    * backend spawns a process per call and serialising them would show a
    * spinner for three round trips instead of one.
+   *
+   * The whole thing is guarded because a call can reject rather than
+   * answer: a backend that failed to load, or a method that is not
+   * there, never reaches the code that decides what to render. Without
+   * this the panel sits on its spinner forever, which is the least
+   * informative way possible to report that something is wrong - and
+   * is exactly what a Deck showed.
    */
   const refresh = useCallback(async () => {
-    const [where, list, checked] = await Promise.all([
-      fetchInstalled(),
-      fetchGames(),
-      checkAll(),
-    ]);
+    try {
+      const [where, list, checked] = await Promise.all([
+        fetchInstalled(),
+        fetchGames(),
+        checkAll(),
+      ]);
 
-    setInstall(where);
+      setBroken(null);
 
-    setRows(list.games ?? []);
+      setInstall(where);
 
-    const next: Record<string, CheckRow> = {};
+      setRows(list.games ?? []);
 
-    for (const row of checked.games ?? []) {
-      next[row.game_id] = row;
+      const next: Record<string, CheckRow> = {};
+
+      for (const row of checked.games ?? []) {
+        next[row.game_id] = row;
+      }
+
+      setStates(next);
+    } catch (error) {
+      setBroken(
+        error instanceof Error ? error.message : String(error ?? "unknown"),
+      );
     }
-
-    setStates(next);
   }, []);
 
   //
@@ -210,6 +232,33 @@ const Content: FC = () => {
   const onActivity = useCallback(async () => {
     showModal(<Activity answer={await logs(LOG_LINES)} />);
   }, []);
+
+  //
+  // The bridge failed, so nothing below can be trusted to load either.
+  // Said plainly, with somewhere to look: this is a problem with the
+  // plugin rather than with SaveCloud, and Decky keeps its own log.
+  //
+  if (broken !== null) {
+    return (
+      <PanelSection title="SaveCloud">
+        <PanelSectionRow>
+          <div style={{ fontSize: "0.9em" }}>
+            The plugin could not reach its backend.
+            <div style={{ marginTop: "8px", opacity: 0.8 }}>{broken}</div>
+            <div style={{ marginTop: "8px", opacity: 0.8 }}>
+              Decky records why in ~/homebrew/logs/plugin_loader.log.
+            </div>
+          </div>
+        </PanelSectionRow>
+
+        <PanelSectionRow>
+          <ButtonItem layout="below" onClick={() => void refresh()}>
+            Try again
+          </ButtonItem>
+        </PanelSectionRow>
+      </PanelSection>
+    );
+  }
 
   if (install === null) {
     return (
