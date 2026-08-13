@@ -285,7 +285,7 @@ const Content: FC = () => {
         </PanelSectionRow>
 
         <PanelSectionRow>
-          <ButtonItem layout="below" onClick={() => void refresh()}>
+          <ButtonItem layout="below" onClick={() => void refresh(1)}>
             Try again
           </ButtonItem>
         </PanelSectionRow>
