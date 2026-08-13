@@ -12,6 +12,7 @@ import subprocess
 from savecloud.launchers import LauncherRegistry
 
 from savecloud.models.device_profile import DeviceProfile
+from savecloud.utils.executable import launch_options
 
 
 class LaunchService:
@@ -52,7 +53,7 @@ class LaunchService:
                 f'"{profile.game_id}" has no launch command on this '
                 f"device, so SaveCloud cannot start it. Either set one, "
                 f"or launch it from Steam with:\n"
-                f"    savecloud wrap {profile.game_id} -- %command%",
+                f"    {launch_options(profile.game_id)}",
             )
 
         if not launcher.validate(

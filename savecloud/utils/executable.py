@@ -102,13 +102,28 @@ def savecloud_executable() -> Path | None:
     return Path(found).resolve() if found else None
 
 
-def launch_options(game_id: str) -> str:
+def launch_options(game_id: str, option: str = "") -> str:
     """
     The line to paste into a game's Launch Options in Steam.
 
     Steam replaces `%command%` with the whole real invocation, Proton
     included, so one line covers a native game and a Windows one
     alike.
+
+    Every suggestion of this line goes through here. Several used to
+    build it by hand with a bare `savecloud`, which reads fine in a
+    terminal and fails in Steam: launch options are not run through a
+    login shell, so `~/.local/bin` is not on PATH and the name resolves
+    to nothing. The game then does not start, and removing SaveCloud
+    from the line "fixes" it - which is exactly the wrong lesson.
+
+    Parameters
+    ----------
+    game_id
+        Game the line is for.
+    option
+        A resolution flag to place before the game ID, when one is
+        being suggested alongside it.
     """
 
     executable = _stable_path()
@@ -121,7 +136,9 @@ def launch_options(game_id: str) -> str:
 
     program = shlex.quote(str(executable)) if executable else NAME
 
-    return f"{program} wrap {game_id} -- %command%"
+    before = f"{option} " if option else ""
+
+    return f"{program} wrap {before}{game_id} -- %command%"
 
 
 def _script_directories() -> list[Path]:

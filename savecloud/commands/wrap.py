@@ -25,6 +25,7 @@ import typer
 from savecloud.services.locking import GameBusyError
 from savecloud.services.autosync import AutoSyncService
 from savecloud.services.sync import SyncConflictError
+from savecloud.utils.executable import launch_options
 from savecloud.utils.output import report_busy, report_conflict, require_game, resolution_from_flags
 
 
@@ -81,7 +82,7 @@ def wrap(
         )
 
         typer.echo()
-        typer.echo(f"    savecloud wrap {argv[0]} {game_id} -- %command%")
+        typer.echo(f"    {launch_options(game_id, argv[0])}")
 
         raise typer.Exit(code=2)
 
@@ -94,7 +95,7 @@ def wrap(
         typer.echo()
         typer.echo("Set the game's Steam launch options to:")
         typer.echo()
-        typer.echo(f"    savecloud wrap {game_id} -- %command%")
+        typer.echo(f"    {launch_options(game_id)}")
 
         raise typer.Exit(code=2)
 

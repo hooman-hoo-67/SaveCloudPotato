@@ -15,6 +15,8 @@ from pathlib import Path
 from savecloud.utils import executable
 from savecloud.utils.executable import launch_options, savecloud_executable
 
+from tests.conftest import GAME_ID
+
 
 def make_executable(path: Path) -> Path:
     """
@@ -352,3 +354,62 @@ def test_the_game_id_is_always_present(tmp_path, monkeypatch):
     assert "wrap pokemon-scarlet -- %command%" in (
         launch_options("pokemon-scarlet")
     )
+
+
+#
+# Every suggestion of the line, not just the one doctor prints
+#
+
+
+def test_no_command_suggests_a_line_steam_can_run(
+    registered_game,
+    monkeypatch,
+    tmp_path,
+):
+    """
+    Reported from a Steam Deck: the game would not start with SaveCloud
+    in its launch options, and started fine without it.
+
+    `wrap` with no command printed the line to paste, built by hand as
+    a bare `savecloud`. Launch options are not run through a login
+    shell, so ~/.local/bin is not on PATH and the name resolves to
+    nothing - which teaches exactly the wrong lesson, since removing
+    SaveCloud from the line makes the game work.
+    """
+
+    from typer.testing import CliRunner
+
+    from savecloud.cli import app
+
+    installed = tmp_path / ".local" / "bin" / "savecloud"
+
+    installed.parent.mkdir(parents=True)
+
+    installed.write_text("#!/bin/sh\n", encoding="utf-8")
+
+    installed.chmod(0o755)
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("APPIMAGE", str(tmp_path / "SaveCloud.AppImage"))
+
+    result = CliRunner().invoke(app, ["wrap", GAME_ID])
+
+    assert result.exit_code == 2
+
+    #
+    # An absolute path, so Steam can find it without a shell.
+    #
+
+    assert "/" in result.output.split("wrap")[0].split()[-1]
+
+
+def test_a_resolution_flag_keeps_its_place(registered_game):
+    """
+    The flag has to come before the game ID, and still name a path.
+    """
+
+    line = executable.launch_options(GAME_ID, "--keep-local")
+
+    assert f"--keep-local {GAME_ID}" in line
+
+    assert line.endswith("-- %command%")
