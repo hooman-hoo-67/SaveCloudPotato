@@ -254,7 +254,8 @@ const Content: FC = () => {
             The plugin could not reach its backend.
             <div style={{ marginTop: "8px", opacity: 0.8 }}>{broken}</div>
             <div style={{ marginTop: "8px", opacity: 0.8 }}>
-              Decky records why in ~/homebrew/logs/plugin_loader.log.
+              The newest file in ~/homebrew/logs/SaveCloud/ says what the
+              backend did, or that it was never asked.
             </div>
           </div>
         </PanelSectionRow>
