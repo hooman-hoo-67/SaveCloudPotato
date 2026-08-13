@@ -21,6 +21,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import signal
+import shlex
 import subprocess
 import threading
 
@@ -76,6 +77,14 @@ def auto_sync_enabled(game: Game) -> bool:
         return True
 
     return DeviceService.load_profile(device_id, game_id).enabled
+
+
+#
+# What a shell returns when it cannot find the command. Reaching
+# SaveCloud means the game never started rather than ended badly.
+#
+
+COMMAND_NOT_FOUND = 127
 
 
 def _is_ordinary_exit(exit_code: int) -> bool:
@@ -291,6 +300,23 @@ class AutoSyncService:
 
             RegistryService.update_runtime(game)
 
+            #
+            # What Steam actually handed over. `%command%` expands to
+            # far more than the game on a Deck - a reaper, a runtime
+            # entry point, a compatibility tool - and when one of those
+            # fails there is nothing but an exit code to go on.
+            #
+            # Diagnosing that once meant reasoning backwards from 127
+            # with no idea what had been run. A line costs nothing and
+            # answers it outright.
+            #
+
+            log.info(
+                "%s: launching %s",
+                game.manifest.game_id,
+                shlex.join(argv),
+            )
+
             process = subprocess.Popen(argv)
 
             history = AutoSyncService._push_history_in_background(game)
@@ -467,6 +493,25 @@ class AutoSyncService:
             exit_code,
             "ordinary" if _is_ordinary_exit(exit_code) else "unexpected",
         )
+
+        #
+        # 127 is a shell saying it could not find what it was asked to
+        # run. Reaching here with it means the game never started, so
+        # the "session" that just ended contains no play at all.
+        #
+        # Worth naming, because from the outside it looks like
+        # SaveCloud broke the game: it launches without the wrapper and
+        # not with it, and an exit code alone points at neither.
+        #
+
+        if exit_code == COMMAND_NOT_FOUND:
+            log.warning(
+                "%s: nothing was run - the command supplied could not "
+                "be found. If this came from Steam, check that the "
+                "shortcut's target is a program rather than a .desktop "
+                "entry, and that any compatibility tool is set.",
+                game.manifest.game_id,
+            )
 
         game.runtime.mark_exited(exit_code)
 

@@ -206,3 +206,49 @@ def test_the_setting_is_not_synchronized(registered_game, working_save):
 
     for path in remote.rglob("*.json"):
         assert "enabled" not in path.read_text() or path.name != "profile.json"
+
+
+#
+# When the game never started
+#
+
+
+def test_a_command_that_was_not_found_is_named(registered_game, caplog):
+    """
+    Reported from a Steam Deck: the game launched without the wrapper
+    and not with it, and the only evidence was `exited with 127`.
+
+    127 is a shell saying it could not find what it was asked to run,
+    so the session that just "ended" contains no play at all. From the
+    outside that looks like SaveCloud breaking the game, and an exit
+    code alone points at neither side.
+    """
+
+    import logging
+
+    from savecloud.services.autosync import AutoSyncService, PlayResult
+
+    with caplog.at_level(logging.WARNING, logger="savecloud.session"):
+        AutoSyncService.after_exit(
+            registered_game,
+            127,
+            PlayResult(exit_code=0),
+        )
+
+    assert any(
+        "nothing was run" in record.message for record in caplog.records
+    )
+
+
+def test_an_ordinary_exit_says_nothing_extra(registered_game, caplog):
+
+    import logging
+
+    from savecloud.services.autosync import AutoSyncService, PlayResult
+
+    with caplog.at_level(logging.WARNING, logger="savecloud.session"):
+        AutoSyncService.after_exit(registered_game, 0, PlayResult(exit_code=0))
+
+    assert not any(
+        "nothing was run" in record.message for record in caplog.records
+    )
