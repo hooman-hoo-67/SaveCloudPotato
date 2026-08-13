@@ -46,6 +46,16 @@ type Busy = string | null;
 /** The marker `busy` carries while every game is synchronizing. */
 const EVERYTHING = "*";
 
+//
+// How many times to ask before believing the backend is unreachable,
+// and how long to wait between asking. Short enough that a genuinely
+// broken plugin still says so promptly.
+//
+
+const ATTEMPTS = 4;
+
+const RETRY_PAUSE_MS = 700;
+
 const Content: FC = () => {
   const visible = useQuickAccessVisible();
 
@@ -75,7 +85,7 @@ const Content: FC = () => {
    * informative way possible to report that something is wrong - and
    * is exactly what a Deck showed.
    */
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (attempts = ATTEMPTS) => {
     try {
       const [where, list, checked] = await Promise.all([
         fetchInstalled(),
@@ -97,6 +107,20 @@ const Content: FC = () => {
 
       setStates(next);
     } catch (error) {
+      //
+      // The bridge to the backend is established when the plugin
+      // loads, and the panel can mount before it is ready - so the
+      // first call of a session can reject for no reason worse than
+      // being early. Giving up on one attempt turns that into a
+      // permanent-looking failure, which is what a Deck showed after
+      // the read stopped waiting for the panel to become visible.
+      //
+      if (attempts > 1) {
+        await new Promise((wake) => setTimeout(wake, RETRY_PAUSE_MS));
+
+        return refresh(attempts - 1);
+      }
+
       setBroken(
         error instanceof Error ? error.message : String(error ?? "unknown"),
       );
