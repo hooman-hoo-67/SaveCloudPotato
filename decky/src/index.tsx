@@ -104,15 +104,23 @@ const Content: FC = () => {
   }, []);
 
   //
-  // Re-check whenever the panel is opened, not only on mount. The panel
-  // stays mounted for the whole session, so a status read before a game
-  // was played would still be on screen after it - saying "Up to date"
+  // On mount, and again whenever the panel is opened. The panel stays
+  // mounted for the whole session, so a status read before a game was
+  // played would still be on screen after it - saying "Up to date"
   // about a save that has since changed.
   //
+  // Deliberately not conditional on `visible`. It used to be, and that
+  // made the very first read depend on a hook reporting true at the
+  // moment of mounting. On a Deck it did not: the backend loaded, no
+  // call was ever made, and the panel sat on its spinner forever with
+  // nothing in any log to say why, because nothing had gone wrong -
+  // nothing had happened at all.
+  //
+  // Refreshing when the panel closes as well is the cost, and it is a
+  // small one next to a panel that never loads.
+  //
   useEffect(() => {
-    if (visible) {
-      void refresh();
-    }
+    void refresh();
   }, [visible, refresh]);
 
   /**

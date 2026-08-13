@@ -251,9 +251,20 @@ class Plugin:
         render.
         """
 
+        #
+        # Every call, before anything can go wrong with it. Diagnosing
+        # a blank panel once meant guessing whether calls were arriving
+        # at all: the backend logged that it started and then nothing,
+        # which looks identical whether it is idle or unreachable.
+        #
+
+        decky.logger.info("running: %s", " ".join(arguments))
+
         command = locate()
 
         if command is None:
+            decky.logger.warning("savecloud was not found for this user")
+
             return {
                 "ok": False,
                 "error": "SaveCloud is not installed for this user.",
